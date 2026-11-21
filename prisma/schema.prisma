@@ -625,3 +625,191 @@ model DailyStats {
   sessions    Int       @default(0)
   avgSession  Float     @default(0) // minutes
 }
+
+// =====================================================================
+// PHASE 1 — COZY RP CORE (additive; legacy monster-collector models above
+// stay untouched until the Phase 2 content migration)
+// =====================================================================
+
+model WorldTile {
+  id        String   @id // "t_07_04"
+  x         Int
+  z         Int
+  version   Int      @default(1)
+  poiCount  Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([x, z])
+  @@index([version])
+}
+
+model Poi {
+  id           String   @id @default(cuid())
+  tileId       String
+  type         PoiType
+  name         String
+  nameEn       String?
+  x            Float
+  z            Float
+  radius       Float    @default(4.5)
+  district     String
+  street       String?
+  craft        String?
+  action       String?
+  hoursStart   Int?
+  hoursEnd     Int?
+  payload      Json?
+  isActive     Boolean  @default(true)
+
+  @@index([tileId, type])
+  @@index([district])
+}
+
+enum PoiType {
+  SHOP
+  FOOD
+  LANDMARK
+  QUEST_GIVER
+  PHOTO_SPOT
+  BENCH
+  SHRINE
+  WORKSHOP
+  TRANSPORT
+}
+
+model PlayerProfile {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  name        String  @db.VarChar(24)
+  persona     Persona @default(STUDENT)
+  bio         String? @db.VarChar(200)
+  inCharacter Boolean @default(true)
+  craftLevel  Int     @default(1)
+  craftXp     Int     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  wallet      Wallet?
+  saves       SaveSlot[]
+}
+
+enum Persona {
+  STUDENT
+  SILVERSMITH
+  PHO_VENDOR
+  CYCLO_DRIVER
+  PHOTOGRAPHER
+  FOLK_SINGER
+}
+
+model SaveSlot {
+  id         String   @id @default(cuid())
+  profileId  String
+  profile    PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  slot       Int
+  version    Int      @default(1)
+  payload    Json
+  updatedAt  DateTime @updatedAt
+
+  @@unique([profileId, slot])
+}
+
+// Double-entry ledger: every row belongs to a transaction whose deltas sum to 0.
+model Wallet {
+  id        String   @id @default(cuid())
+  profileId String   @unique
+  profile   PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  dong      BigInt   @default(0)
+  hoaSen    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  entries   LedgerEntry[]
+}
+
+model LedgerEntry {
+  id             String   @id @default(cuid())
+  walletId       String?
+  wallet         Wallet?  @relation(fields: [walletId], references: [id])
+  transactionId  String
+  account        String   // wallet:<id> | system:faucet | system:shop
+  deltaDong      BigInt
+  reason         String
+  idempotencyKey String   @unique
+  createdAt      DateTime @default(now())
+
+  @@index([transactionId])
+  @@index([account, createdAt])
+}
+
+model Purchase {
+  id          String        @id @default(cuid())
+  userId      String
+  sku         String
+  amountVnd   Int
+  provider    String // VNPAY | MOMO | ZALOPAY | STORE
+  providerRef String?       @unique
+  status      PaymentStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+
+  @@index([userId, createdAt])
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model PhotoPost {
+  id         String     @id @default(cuid())
+  userId     String
+  url        String
+  caption    String?    @db.VarChar(140)
+  poiId      String?
+  likes      Int        @default(0)
+  visibility Visibility @default(PUBLIC)
+  createdAt  DateTime   @default(now())
+
+  @@index([createdAt])
+}
+
+enum Visibility {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  reporterId String
+  targetType String
+  targetId   String
+  reason     String
+  status     ReportStatus @default(OPEN)
+  handledBy  String?
+  createdAt  DateTime     @default(now())
+
+  @@index([status, createdAt])
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  REJECTED
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([actorId, createdAt])
+}
