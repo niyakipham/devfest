@@ -21,13 +21,17 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "baseUrl": ".",
+    "types": ["vitest/globals", "node"],
     "paths": {
       "@/*": ["src/*"],
-      "@core/*": ["src/core/*"],
-      "@modules/*": ["src/modules/*"],
-      "@shared/*": ["src/shared/*"]
+      "@shared/*": ["src/shared/*"],
+      "@world/*": ["src/world/*"],
+      "@rp/*": ["src/rp/*"],
+      "@game/*": ["src/game/*"],
+      "@server/*": ["src/server/*"]
     }
   },
   "include": ["src"],
+  "exclude": ["src/legacy"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
