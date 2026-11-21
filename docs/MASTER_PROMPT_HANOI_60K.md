@@ -497,6 +497,13 @@ if (totalDongEarned / 3600 > 5 * expected) flag(ECONOMY_ANOMALY)
 
 ## 3. STEP 2 === { DESIGN UX/UI SAU } (DỰA TRÊN IMAGE STYLE — 200 OK)
 
+> ⚠️ **CẬP NHẬT v2 (2026-11-21):** Chủ dự án đổi hướng thị giác sang HUD in-game kiểu *Bright Let's-Go*
+> (xem [`docs/adr/ADR-002-hud-bright-lets-go.md`](./adr/ADR-002-hud-bright-lets-go.md)). Token v1 bên dưới
+> **được thay** bởi: slab `rgba(17,43,52,.62)` · glass `rgba(255,255,255,.94)` · ink `#123A4B` · teal
+> `#21B4E0` · green `#3FC24B` · lime `#8ED44A` · yellow `#F7C948` · red `#E8483F`; panel 26px, pill 999px,
+> nút có cạnh đáy `0 5px 0`; bố cục HUD: plate giữa trên, rail icon trái, party wheel + thanh L/R phải dưới.
+> Các mục 3.4–3.8 (motion, flow, screen inventory) vẫn giữ nguyên giá trị.
+
 > **YÊU CẦU THỰC THI:** Áp dụng **chính xác** hệ token dưới đây lên các chức năng ở STEP 1. Không tự thêm màu ngoài palette. Không dùng font không hỗ trợ tiếng Việt.
 
 ### 3.1 Giải mã Style từ ảnh (Phân tích 3)

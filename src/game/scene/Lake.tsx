@@ -11,11 +11,11 @@ const Water = () => (
       receiveShadow
     >
       <circleGeometry args={[1, 96]} />
-      <meshStandardMaterial color="#C9BE9A" roughness={1} />
+      <meshStandardMaterial color="#D8CEA6" roughness={1} />
     </mesh>
     <mesh position={[LAKE.cx, 0.08, LAKE.cz]} scale={[LAKE.rx, LAKE.rz, 1]} rotation={[-Math.PI / 2, 0, 0]}>
       <circleGeometry args={[1, 96]} />
-      <meshStandardMaterial color="#528E88" roughness={0.18} metalness={0.22} transparent opacity={0.97} />
+      <meshStandardMaterial color="#37AFD6" roughness={0.14} metalness={0.2} transparent opacity={0.97} />
     </mesh>
     <mesh
       position={[LAKE.cx, 0.1, LAKE.cz]}
@@ -23,7 +23,7 @@ const Water = () => (
       rotation={[-Math.PI / 2, 0, 0]}
     >
       <circleGeometry args={[1, 64]} />
-      <meshStandardMaterial color="#9FC3B7" roughness={0.2} metalness={0.1} transparent opacity={0.22} />
+      <meshStandardMaterial color="#B6ECFA" roughness={0.2} metalness={0.1} transparent opacity={0.3} />
     </mesh>
   </group>
 )

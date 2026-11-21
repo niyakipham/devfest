@@ -46,6 +46,7 @@ export const Player = () => {
       if (e.code === 'KeyE') useGameStore.getState().interact()
       if (e.code === 'Escape') {
         const s = useGameStore.getState()
+        if (s.mapOpen || s.journalOpen) return
         if (s.dialogue) s.closeDialogue()
         else if (s.phase === 'PLAYING') s.pause()
         else if (s.phase === 'PAUSED') s.resume()
@@ -99,6 +100,11 @@ export const Player = () => {
     const dt = Math.min(rawDelta, 0.05)
     const store = useGameStore.getState()
     if (store.phase !== 'PLAYING') return
+    if (store.dialogue || store.journalOpen || store.mapOpen) {
+      // menus freeze the body, not the world clock
+      if (group.current) group.current.position.set(playerRef.x, 0, playerRef.z)
+      return
+    }
 
     const needs = store.player.needs
     const sprint = keys.has('ShiftLeft') || keys.has('ShiftRight')

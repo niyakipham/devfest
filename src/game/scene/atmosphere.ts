@@ -10,11 +10,11 @@ export interface Atmosphere {
 }
 
 const NIGHT: Atmosphere = {
-  sky: '#2E4A50',
-  fog: '#33514F',
-  sun: '#9FB6C9',
-  sunIntensity: 0.35,
-  ambient: 0.42,
+  sky: '#24425A',
+  fog: '#2C4E5E',
+  sun: '#A8C2DA',
+  sunIntensity: 0.4,
+  ambient: 0.48,
   night: true,
 }
 
@@ -24,50 +24,50 @@ export const atmosphereAt = (minutes: number): Atmosphere => {
   if (h < 4.5 || h >= 19.5) return NIGHT
   if (h < 6.5) {
     return {
-      sky: '#C9DCCB',
-      fog: '#D7E4CE',
-      sun: '#F3C08A',
-      sunIntensity: 1.05,
-      ambient: 0.55,
+      sky: '#CDEEF3',
+      fog: '#DCEEEC',
+      sun: '#FFD9A0',
+      sunIntensity: 1.4,
+      ambient: 0.62,
       night: false,
     }
   }
   if (h < 10) {
     return {
-      sky: '#D6E8D8',
-      fog: '#DCE9D4',
-      sun: '#FFE0AE',
-      sunIntensity: 1.75,
-      ambient: 0.62,
+      sky: '#C6EBF3',
+      fog: '#D6EEEC',
+      sun: '#FFEBBF',
+      sunIntensity: 1.95,
+      ambient: 0.68,
       night: false,
     }
   }
   if (h < 16) {
     return {
-      sky: '#DDEEDD',
-      fog: '#D8E8D7',
-      sun: '#FFF4D6',
-      sunIntensity: 1.9,
-      ambient: 0.68,
+      sky: '#BFE9F5',
+      fog: '#CFEAF2',
+      sun: '#FFF7DF',
+      sunIntensity: 2.05,
+      ambient: 0.72,
       night: false,
     }
   }
   if (h < 18.5) {
     return {
-      sky: '#EBD3B7',
-      fog: '#E4CDB4',
-      sun: '#F2A76E',
-      sunIntensity: 1.35,
-      ambient: 0.6,
+      sky: '#F6D3B0',
+      fog: '#EBCFAF',
+      sun: '#F7A96E',
+      sunIntensity: 1.45,
+      ambient: 0.64,
       night: false,
     }
   }
   return {
-    sky: '#8FA6A4',
-    fog: '#8FA6A4',
-    sun: '#E39A75',
-    sunIntensity: 0.7,
-    ambient: 0.5,
+    sky: '#9FBFC4',
+    fog: '#9FBFC4',
+    sun: '#E9A377',
+    sunIntensity: 0.8,
+    ambient: 0.55,
     night: false,
   }
 }

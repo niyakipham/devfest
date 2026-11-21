@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { useGameStore } from '../store'
 import { QUESTS } from '../content/quests'
 import { dayLabel, formatClock } from '../scene/atmosphere'
@@ -19,17 +18,9 @@ export const Journal = () => {
   const pieces = useGameStore((s) => s.pieces)
   const tile = useGameStore((s) => s.tile)
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'KeyJ' || e.code === 'Escape') toggleJournal()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [toggleJournal])
-
   return (
     <div className="journal">
-      <div className="cream-card journal__card">
+      <div className="panel journal__card">
         <div className="journal__head">
           <div>
             <h2>Nhật ký của {player.name}</h2>
@@ -37,7 +28,7 @@ export const Journal = () => {
               {dayLabel(clock.day, clock.season)} · {formatClock(clock.minutes)} · ô {tile}
             </p>
           </div>
-          <button type="button" className="pill pill--ghost pill--small" onClick={toggleJournal}>
+          <button type="button" className="btn btn--ghost btn--small" onClick={toggleJournal}>
             Đóng (J)
           </button>
         </div>

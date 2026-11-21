@@ -26,10 +26,10 @@ describe('UI shell (design system)', () => {
     expect(container.querySelector('.title__logo h1')?.textContent).toContain('Hà Nội')
     expect(screen.getByText('Chơi mới')).toBeTruthy()
     expect(screen.getByText('Tiếp tục')).toBeTruthy()
-    expect(container.querySelector('.cream-card')).toBeTruthy()
-    expect(container.querySelectorAll('.pill').length).toBeGreaterThanOrEqual(4)
+    expect(container.querySelector('.panel')).toBeTruthy()
+    expect(container.querySelectorAll('.btn').length).toBeGreaterThanOrEqual(4)
     // primary action is the sage pill, disabled save is ghosted
-    expect(container.querySelector('.pill--disabled')).toBeTruthy()
+    expect(container.querySelector('.btn--disabled')).toBeTruthy()
   })
 
   it('walks the player from title to character creation to the world HUD', () => {
@@ -44,9 +44,9 @@ describe('UI shell (design system)', () => {
     fireEvent.click(screen.getByText('Bắt đầu ngày mới'))
 
     expect(useGameStore.getState().phase).toBe('PLAYING')
-    expect(screen.getByText('05:40')).toBeTruthy()
+    expect(screen.getByText(/05:40/)).toBeTruthy()
     expect(container.querySelector('.hud')).toBeTruthy()
-    expect(container.querySelector('.hud__bar')).toBeTruthy()
+    expect(container.querySelector('.need__fill')).toBeTruthy()
   })
 
   it('shows the interaction prompt and opens a dialogue card', async () => {
@@ -56,8 +56,8 @@ describe('UI shell (design system)', () => {
     act(() => {
       useGameStore.getState().scanNearestPoi(POIS.find((p) => p.id === 'npc-co-hoa')!.x, POIS.find((p) => p.id === 'npc-co-hoa')!.z)
     })
-    const prompt = screen.getByText(/Cô Hoa bán phở/)
-    expect(prompt).toBeTruthy()
+    // the name plate and the interaction prompt both surface the NPC
+    expect(screen.getAllByText(/Cô Hoa bán phở/).length).toBeGreaterThanOrEqual(1)
 
     act(() => {
       useGameStore.getState().interact()
@@ -66,6 +66,25 @@ describe('UI shell (design system)', () => {
     const nextButton = await screen.findByText('Tiếp', {}, { timeout: 4000 })
     fireEvent.click(nextButton)
     await screen.findByText(/Ăn một bát phở bò/, {}, { timeout: 4000 })
+  })
+
+  it('opens the 20 km² map from the left rail', () => {
+    useGameStore.getState().startNew('Minh', 'STUDENT')
+    render(<CozyApp />)
+    fireEvent.click(screen.getByLabelText('Bản đồ'))
+    expect(screen.getByText(/Bản đồ Hà Nội · 20 km²/)).toBeTruthy()
+    fireEvent.click(screen.getByText('Đóng'))
+    expect(useGameStore.getState().mapOpen).toBe(false)
+  })
+
+  it('quick-eats from the party wheel and spends dong', () => {
+    useGameStore.getState().startNew('Minh', 'STUDENT')
+    const before = useGameStore.getState().player.dong
+    render(<CozyApp />)
+    fireEvent.click(screen.getByLabelText('Bánh mì dọc đường'))
+    const after = useGameStore.getState().player.dong
+    expect(after).toBe(before - 25)
+    expect(screen.getByText(/Bánh mì nóng/)).toBeTruthy()
   })
 
   it('offers a pause card with save and resume', () => {

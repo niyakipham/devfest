@@ -4,6 +4,7 @@ import { useGameStore } from '../store'
 interface Item {
   id: string
   label: string
+  icon: string
   disabled?: boolean
   action: () => void
 }
@@ -16,25 +17,28 @@ export const TitleScreen = () => {
   const [index, setIndex] = useState(0)
 
   const items: Item[] = [
-    { id: 'new', label: 'Chơi mới', action: () => setPhase('CREATOR') },
+    { id: 'new', label: 'Chơi mới', icon: '▶', action: () => setPhase('CREATOR') },
     {
       id: 'continue',
       label: 'Tiếp tục',
+      icon: '⏵',
       disabled: !hasSave,
       action: () => continueGame(),
     },
     {
       id: 'settings',
       label: 'Cài đặt',
+      icon: '⚙',
       action: () => addToast({ title: 'Cài đặt', message: 'Đồ hoạ, âm thanh và phím tắt — Phase 2.', tone: 'info' }),
     },
     {
       id: 'credits',
       label: 'Giới thiệu',
+      icon: '★',
       action: () =>
         addToast({
           title: 'Hanoi Legends',
-          message: 'Một thế giới mở 20 km² về Hà Nội. Bản dựng Phase 1 — Hoàn Kiếm.',
+          message: 'Thế giới mở 20 km² về Hà Nội. Bản dựng Phase 1 — Hoàn Kiếm.',
           tone: 'info',
         }),
     },
@@ -65,37 +69,39 @@ export const TitleScreen = () => {
         <h1>
           Hà Nội
           <br />
-          Legends
+          <em>Legends</em>
         </h1>
         <h2>Phố cổ · 20 km²</h2>
       </div>
 
       <div className="title__menu">
-        <div className="cream-card">
+        <div className="panel">
           <div className="title__items">
-            {items.map((item, i) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`pill ${i === index && !item.disabled ? '' : 'pill--ghost'} ${
-                  item.disabled ? 'pill--disabled' : ''
-                }`}
-                onMouseEnter={() => setIndex(i)}
-                onClick={() => !item.disabled && item.action()}
-              >
-                {item.label}
-              </button>
-            ))}
+            {items.map((item, i) => {
+              const selected = i === index && !item.disabled
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`btn ${selected ? '' : 'btn--ghost'} ${item.disabled ? 'btn--disabled' : ''}`}
+                  onMouseEnter={() => setIndex(i)}
+                  onClick={() => !item.disabled && item.action()}
+                >
+                  <span aria-hidden="true" style={{ fontSize: 15, opacity: 0.85 }}>
+                    {item.icon}
+                  </span>
+                  {item.label}
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
 
-      <div className="title__hint">↑ ↓ để chọn · Enter để xác nhận · Chuột kéo để ngắm thành phố</div>
+      <div className="title__hint">↑ ↓ chọn · Enter xác nhận · kéo chuột để ngắm thành phố</div>
 
       <div className="title__select">
-        <div className="hud__chip">
-          <span className="hud__key">A</span> Chọn
-        </div>
+        <span className="keycap">A</span> Chọn
       </div>
     </div>
   )

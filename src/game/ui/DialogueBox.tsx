@@ -50,38 +50,53 @@ export const DialogueBox = () => {
 
   return (
     <div className="dialogue" onClick={advance}>
-      <div className="cream-card dialogue__card" onClick={(e) => e.stopPropagation()}>
+      <div className="panel dialogue__panel" onClick={(e) => e.stopPropagation()}>
         <div className="dialogue__speaker">
           <strong>{node.speaker}</strong>
           <span>{node.role}</span>
         </div>
+
         <p className="dialogue__line">
           {shown}
-          {!lineDone && <span style={{ opacity: 0.5 }}>▍</span>}
+          {!lineDone && <span style={{ opacity: 0.45 }}>▍</span>}
         </p>
 
-        {lineDone && (
-          <div className="dialogue__choices" onClick={(e) => e.stopPropagation()}>
-            {lastLine ? (
-              node.choices.map((choice, i) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          {lineDone && lastLine && (
+            <div className="dialogue__choices">
+              {node.choices.map((choice, i) => (
                 <button
                   key={choice.id}
                   type="button"
-                  className={`pill ${i === 0 ? '' : 'pill--ghost'}`}
+                  className={`btn ${i === 0 ? '' : 'btn--ghost'}`}
                   style={{ justifyContent: 'space-between' }}
                   onClick={() => choose(choice.id)}
                 >
                   <span>{choice.label}</span>
-                  {choice.cost ? <span style={{ opacity: 0.85, fontSize: 15 }}>{choice.cost}đ</span> : null}
+                  {choice.cost ? (
+                    <span style={{ fontSize: 14, opacity: 0.8, fontWeight: 900 }}>{choice.cost}đ</span>
+                  ) : null}
                 </button>
-              ))
-            ) : (
-              <button type="button" className="pill" onClick={advance}>
+              ))}
+            </div>
+          )}
+
+          {lineDone && !lastLine && (
+            <div className="dialogue__next">
+              <button type="button" className="btn btn--teal btn--small" onClick={advance}>
                 Tiếp
               </button>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+
+          {!lineDone && (
+            <div className="dialogue__next">
+              <button type="button" className="btn btn--ghost btn--small" onClick={advance}>
+                Hiện hết
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

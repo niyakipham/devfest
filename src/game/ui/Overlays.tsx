@@ -6,8 +6,13 @@ export const Toasts = () => {
     <div className="toasts">
       {toasts.map((t) => (
         <div key={t.id} className={`toast ${t.tone === 'reward' ? 'toast--reward' : ''}`}>
-          <strong>{t.title}</strong>
-          {t.message && <p>{t.message}</p>}
+          <span className="toast__icon" aria-hidden="true">
+            {t.tone === 'reward' ? '★' : '●'}
+          </span>
+          <div>
+            <strong>{t.title}</strong>
+            {t.message && <p>{t.message}</p>}
+          </div>
         </div>
       ))}
     </div>
@@ -21,20 +26,28 @@ export const PauseOverlay = () => {
 
   return (
     <div className="pause">
-      <div className="cream-card pause__card">
+      <div className="panel pause__card">
         <h3>Tạm dừng</h3>
         <div className="pause__items">
-          <button type="button" className="pill" onClick={resume}>
+          <button type="button" className="btn" onClick={resume}>
             Tiếp tục
           </button>
-          <button type="button" className="pill pill--ghost" onClick={saveNow}>
+          <button type="button" className="btn btn--ghost" onClick={saveNow}>
             Lưu lại
           </button>
-          <button type="button" className="pill pill--ghost" onClick={() => setPhase('TITLE')}>
+          <button type="button" className="btn btn--ghost" onClick={() => setPhase('TITLE')}>
             Về menu chính
           </button>
         </div>
-        <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--c-ink-muted)', marginBottom: 0, fontWeight: 700 }}>
+        <p
+          style={{
+            margin: '14px 0 0',
+            textAlign: 'center',
+            fontSize: 12,
+            fontWeight: 800,
+            color: 'var(--c-ink-muted)',
+          }}
+        >
           Esc để quay lại thành phố
         </p>
       </div>

@@ -77,7 +77,7 @@ const Trees = () => {
       scale.set(s, s * 0.86, s)
       matrix.compose(pos, quat, scale)
       leaves.current?.setMatrixAt(i, matrix)
-      const green = t.hue > 0.62 ? '#7FA84E' : t.hue > 0.3 ? '#5D995D' : '#4E8A5B'
+      const green = t.hue > 0.62 ? '#8FD44A' : t.hue > 0.3 ? '#63B944' : '#4E9F35'
       leaves.current?.setColorAt(i, color.set(green))
     })
 

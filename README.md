@@ -5,7 +5,7 @@
 
 **Trạng thái: Phase 1 — vertical slice Hoàn Kiếm** (blueprint đầy đủ: [`docs/MASTER_PROMPT_HANOI_60K.md`](docs/MASTER_PROMPT_HANOI_60K.md))
 
-![style](https://img.shields.io/badge/style-cozy%20storybook-A4CA9B) ![stack](https://img.shields.io/badge/stack-React%20%2B%20R3F%20%2B%20Express-0A4062) ![tests](https://img.shields.io/badge/tests-54%20passing-6E9B67)
+![style](https://img.shields.io/badge/style-cozy%20storybook-A4CA9B) ![stack](https://img.shields.io/badge/stack-React%20%2B%20R3F%20%2B%20Express-0A4062) ![tests](https://img.shields.io/badge/tests-56%20passing-6E9B67)
 
 ---
 
@@ -15,11 +15,11 @@
 npm install
 npm run dev       # client  → http://localhost:3000
 npm run server    # API     → http://localhost:4000
-npm run check     # typecheck + 54 test + cổng mật độ thế giới
+npm run check     # typecheck + 56 test + cổng mật độ thế giới
 ```
 
-Điều khiển: `W A S D` di chuyển · `Shift` chạy · `E` tương tác · `J` nhật ký · `Esc` tạm dừng ·
-kéo chuột để xoay camera · lăn chuột để zoom · `F9` overlay debug.
+Điều khiển: `W A S D` di chuyển · `Shift` chạy · `E` tương tác · `Q`/`R` đổi công cụ · `J` nhật ký ·
+`M` bản đồ · `Esc` tạm dừng · kéo chuột xoay camera · lăn chuột zoom · `F9` debug.
 
 ---
 
@@ -32,7 +32,7 @@ kéo chuột để xoay camera · lăn chuột để zoom · `F9` overlay debug.
 | **Streaming** | `TileStreamer` thật: ring 5×5, priority theo khoảng cách, budget/tick, unload hysteresis, event load/unload |
 | **RP** | 6 persona, creator, needs (năng lượng / no bụng / an yên) không bao giờ gây chết, đồng hồ + mùa, tiền Đồng, XP tay nghề, danh tiếng |
 | **Quest** | “Một bát phở buổi sáng” → “Chụp Hồ Gươm lúc bình minh”, dialogue có lựa chọn, phần thưởng + mảnh ký ức #1/#2 |
-| **UI** | Design system “Cozy Storybook” trích từ key art: cream card nghiêng −2.5°, viền đứt nét, pill sage, chữ navy `#0A4062`; Title, Creator, HUD, Dialogue, Journal, Pause, Toasts |
+| **UI** | HUD “Bright Let's-Go” (ADR-002): name plate giữa trên, rail icon trái, **party wheel** 3 công cụ + thanh `L…R`, needs thu gọn, panel kính trắng, nút 3D; Title, Creator, HUD, Dialogue, Journal, **Map 20 km²**, Pause, Toasts |
 | **Save** | Zod-validated schema v1, localStorage offline-first, từ chối save hỏng/version lạ, autosave 3 phút |
 | **API** | Auth JWT + bcrypt, save 3 slot, world tile/POI, wallet **double-entry ledger** với idempotency, rate limit, RBAC sẵn khung |
 
@@ -62,7 +62,7 @@ src/
 │   ├── services/   auth, ledger (double-entry), save
 │   └── repo/       memory store (thay bằng Prisma ở Phase 4)
 ├── legacy/         ⚠️ code monster-collector cũ, đã archive, KHÔNG build
-└── __tests__/      54 test: formulas, world, streamer, save, server, UI
+└── __tests__/      56 test: formulas, world, streamer, save, server, UI
 ```
 
 **Luật phụ thuộc:** `shared ← world ← game` · `server` chỉ import `shared`. Không module nào import chéo.
@@ -72,7 +72,7 @@ src/
 ## Cổng chất lượng (chạy trong `npm run check`)
 
 1. `tsc --noEmit` — strict, không `any` ẩn.
-2. `vitest` — 54 test, gồm test UI (jsdom) và API thật (http listen + fetch).
+2. `vitest` — 56 test, gồm test UI (jsdom) và API thật (http listen + fetch).
 3. `verify:world` — mật độ POI.
 4. `vite build` — bundle **294 kB gzip** (ngân sách 2.5 MB).
 

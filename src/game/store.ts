@@ -58,6 +58,7 @@ export interface GameStore {
   pieces: string[]
   dialogue: DialogueState | null
   journalOpen: boolean
+  mapOpen: boolean
   prompt: string | null
   promptPoi: Poi | null
   toasts: Toast[]
@@ -79,6 +80,9 @@ export interface GameStore {
   choose: (choiceId: string) => void
   closeDialogue: () => void
   toggleJournal: () => void
+  toggleMap: () => void
+  quickEat: () => void
+  photoAttempt: () => void
 
   syncTransform: () => void
   setStreamStats: (tile: string, loadedTiles: number) => void
@@ -113,6 +117,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   pieces: [],
   dialogue: null,
   journalOpen: false,
+  mapOpen: false,
   prompt: null,
   promptPoi: null,
   toasts: [],
@@ -368,7 +373,45 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   closeDialogue: () => set({ dialogue: null }),
 
-  toggleJournal: () => set({ journalOpen: !get().journalOpen }),
+  toggleJournal: () => set({ journalOpen: !get().journalOpen, mapOpen: false }),
+
+  toggleMap: () => set({ mapOpen: !get().mapOpen, journalOpen: false }),
+
+  quickEat: () => {
+    const { player } = get()
+    const snack = FOOD.banhMi
+    if (player.dong < snack.price) {
+      get().addToast({ title: 'Ví không đủ', message: `Bánh mì ${snack.price}đ — bạn còn ${player.dong}đ.`, tone: 'info' })
+      return
+    }
+    set({
+      player: {
+        ...player,
+        dong: player.dong - snack.price,
+        needs: {
+          ...player.needs,
+          hunger: Math.min(100, player.needs.hunger + snack.hunger),
+          mood: Math.min(100, player.needs.mood + snack.mood),
+        },
+      },
+    })
+    get().addToast({ title: 'Bánh mì nóng', message: `−${snack.price}đ · ăn dọc đường`, tone: 'info' })
+  },
+
+  photoAttempt: () => {
+    const poi = nearestPoi(playerRef.x, playerRef.z, 12)
+    if (!poi || poi.type !== 'PHOTO_SPOT') {
+      get().addToast({ title: 'Chưa có gì trong khung hình', message: 'Tới điểm ngắm cảnh rồi hãy giơ máy lên.', tone: 'info' })
+      return
+    }
+    if (get().quests['q-photo']?.state === 'ACTIVE') {
+      completeQuest(set, get, 'q-photo')
+      return
+    }
+    const { player } = get()
+    set({ player: { ...player, needs: { ...player.needs, mood: Math.min(100, player.needs.mood + 4) } } })
+    get().addToast({ title: `Một tấm ảnh ${poi.name}`, message: 'Ánh sáng đẹp. Bạn lưu vào album.', tone: 'info' })
+  },
 
   syncTransform: () => {
     const { player } = get()

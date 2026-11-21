@@ -21,7 +21,7 @@ const Ground = () => {
           x: LAKE.cx + Math.cos(angle) * (140 + i * 46),
           z: LAKE.cz + Math.sin(angle) * (170 + i * 38),
           s: 70 + ((i * 37) % 90),
-          color: i % 3 === 0 ? '#8CB25C' : i % 3 === 1 ? '#6E9C4E' : '#7CA855',
+          color: i % 3 === 0 ? '#97DA55' : i % 3 === 1 ? '#6DBB39' : '#84CB46',
         }
       }),
     [],
@@ -31,7 +31,7 @@ const Ground = () => {
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[2500, 0, 2000]} receiveShadow>
         <planeGeometry args={[5200, 4200]} />
-        <meshStandardMaterial color="#7FA85A" roughness={1} />
+        <meshStandardMaterial color="#7CC63F" roughness={1} />
       </mesh>
       {patches.map((p, i) => (
         <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[p.x, 0.012, p.z]}>
@@ -48,7 +48,7 @@ const Ground = () => {
             scale={[260, 70, 150]}
           >
             <icosahedronGeometry args={[1, 0]} />
-            <meshStandardMaterial color="#5C7F4E" roughness={1} flatShading />
+            <meshStandardMaterial color="#519B34" roughness={1} flatShading />
           </mesh>
         )
       })}
