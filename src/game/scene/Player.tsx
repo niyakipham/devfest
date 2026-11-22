@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import type * as THREE from 'three'
+import * as THREE from 'three'
 import { speedMultiplier } from '@shared/formulas'
 import { isWalkable } from '@world/collision'
 import { useGameStore } from '../store'
 import { cameraRef, playerRef, syncPlayerRef } from '../world-ref'
-import { WORLD } from '@world/palette'
+import { CharacterMesh } from './CharacterMesh'
+import { appearanceFor } from './character'
+import { PHASE_PER_METRE, applyLegPose, walkPose } from './gait'
 
 const blocked = (x: number, z: number): boolean => !isWalkable(x, z)
 
@@ -19,23 +21,6 @@ const prefersReducedMotion = (): boolean =>
 
 const keys = new Set<string>()
 
-const playerColor = (persona: string): string => {
-  switch (persona) {
-    case 'PHOTOGRAPHER':
-      return WORLD.outfitStudent
-    case 'PHO_VENDOR':
-      return WORLD.outfitSmith
-    case 'SILVERSMITH':
-      return WORLD.outfitCyclo
-    case 'CYCLO_DRIVER':
-      return WORLD.outfitCycloGreen
-    case 'FOLK_SINGER':
-      return WORLD.outfitSinger
-    default:
-      return WORLD.outfitDefault
-  }
-}
-
 export const Player = () => {
   const group = useRef<THREE.Group>(null)
   const body = useRef<THREE.Group>(null)
@@ -43,14 +28,20 @@ export const Player = () => {
   const persona = useGameStore((s) => s.player.persona)
   // F9: respect the player setting and the OS preference, not a hard-coded false
   const reduceMotion = useGameStore((s) => s.settings.reduceMotion) || prefersReducedMotion()
-  const bobT = useRef(0)
   /** RP-08 odometer: metres since the last flush, and time since the last flush */
   const walkedRef = useRef({ distance: 0, carry: 0 })
+  /** walk-cycle phase, advanced by metres travelled so feet never slide */
+  const gaitPhase = useRef(0)
+  const leftLeg = useRef<THREE.Group>(null)
+  const rightLeg = useRef<THREE.Group>(null)
   const lastScan = useRef(0)
   const dragging = useRef(false)
   const lastPointer = useRef({ x: 0, y: 0 })
 
-  const color = useMemo(() => playerColor(persona), [persona])
+  // Appearance is derived from the player's name + persona, so the same save always
+  // produces the same person (no reshuffle on reload).
+  const name = useGameStore((s) => s.player.name)
+  const look = useMemo(() => appearanceFor(`${name}:${persona}`, persona), [name, persona])
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -164,7 +155,6 @@ export const Player = () => {
       } else if (!blocked(playerRef.x, nz)) {
         playerRef.z = nz
       }
-      bobT.current += dt * (sprint ? 13 : 9)
 
       // RP-08: distance actually travelled feeds the journal's "km đã đi".
       // Accumulated in a ref and flushed once per second — logging every frame
@@ -182,13 +172,24 @@ export const Player = () => {
     playerRef.moving = isMoving
     playerRef.sprinting = sprint && isMoving
 
-    const bob = isMoving && !reduceMotion ? Math.sin(bobT.current) * 0.055 : 0
+    /* ---------------------------- walk cycle ---------------------------- */
+    // Phase advances with *distance*, not time, so the stride always matches the
+    // ground speed: a slow walk and a sprint both keep their feet planted.
+    const travelled = isMoving ? speed * dt : 0
+    gaitPhase.current = (gaitPhase.current + travelled * PHASE_PER_METRE) % (Math.PI * 2)
+    const pose = walkPose(gaitPhase.current, isMoving ? speed : 0, reduceMotion)
+    applyLegPose([leftLeg.current, rightLeg.current], pose)
+    if (body.current) body.current.rotation.y = pose.twist
+    playerRef.bob = pose.bob
+
     if (group.current) {
-      group.current.position.set(playerRef.x, bob, playerRef.z)
+      // the bob now comes from the gait (two small lifts per stride) instead of a
+      // constant float, which is what made the old figure look like it was hovering
+      group.current.position.set(playerRef.x, playerRef.bob, playerRef.z)
       group.current.rotation.y = playerRef.yaw
     }
-    if (body.current && isMoving) {
-      body.current.rotation.x = Math.sin(bobT.current * 0.5) * 0.02
+    if (body.current && isMoving && !reduceMotion) {
+      body.current.rotation.x = Math.sin(gaitPhase.current * 0.5) * 0.015
     }
 
     // camera rig (absolute yaw; forward = sin/cos, camera sits behind)
@@ -216,22 +217,7 @@ export const Player = () => {
   return (
     <group ref={group} position={[playerRef.x, 0, playerRef.z]}>
       <group ref={body}>
-        <mesh position={[0, 1.0, 0]} castShadow>
-          <capsuleGeometry args={[0.32, 0.75, 6, 12]} />
-          <meshStandardMaterial color={color} roughness={0.85} />
-        </mesh>
-        <mesh position={[0, 1.62, 0]} castShadow>
-          <sphereGeometry args={[0.24, 16, 12]} />
-          <meshStandardMaterial color={WORLD.skin} roughness={0.8} />
-        </mesh>
-        <mesh position={[0, 1.86, 0]} castShadow>
-          <coneGeometry args={[0.46, 0.22, 18]} />
-          <meshStandardMaterial color={WORLD.facadeCream} roughness={0.9} />
-        </mesh>
-        <mesh position={[0, 1.12, -0.18]} castShadow>
-          <boxGeometry args={[0.34, 0.42, 0.18]} />
-          <meshStandardMaterial color={WORLD.hairDark} roughness={0.9} />
-        </mesh>
+        <CharacterMesh look={look} THREEmod={THREE} legRefs={{ left: leftLeg, right: rightLeg }} />
       </group>
     </group>
   )

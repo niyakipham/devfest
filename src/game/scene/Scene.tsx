@@ -11,6 +11,8 @@ import { atmosphereAt } from './atmosphere'
 import { City } from './City'
 import { Lake } from './Lake'
 import { Player } from './Player'
+import { CharacterMesh } from './CharacterMesh'
+import { GARMENTS, RIG, appearanceFor, crowdSlot, hairColor } from './character'
 import { WORLD } from '@world/palette'
 
 const Ground = () => {
@@ -57,6 +59,43 @@ const Ground = () => {
   )
 }
 
+/**
+ * A quest NPC: the shared rig plus a two-second breathing idle and a "turn to the
+ * player when they are close" behaviour. The turn is what makes an NPC feel alive
+ * without any dialogue system running — the old cone-and-sphere figures faced one
+ * fixed direction forever.
+ */
+const NpcFigure = ({ npcId }: { npcId: string }) => {
+  const look = useMemo(() => appearanceFor(npcId), [npcId])
+  const group = useRef<THREE.Group>(null)
+  const base = useRef(0)
+
+  useFrame(({ clock }, dt) => {
+    const t = clock.getElapsedTime()
+    if (!group.current) return
+    // breathing: ±1.5 cm, slow, and it never syncs across NPCs because each uses
+    // its own phase offset derived from the id hash below
+    const phase = (base.current = base.current || (npcId.length % 7) * 0.9)
+    group.current.position.y = Math.sin(t * 1.15 + phase) * 0.015
+
+    // turn toward the player when within 4 m, otherwise drift back to rest
+    const dx = playerRef.x - group.current.position.x
+    const dz = playerRef.z - group.current.position.z
+    const dist = Math.hypot(dx, dz)
+    const target = dist < 4 ? Math.atan2(dx, dz) : group.current.rotation.y
+    let delta = target - group.current.rotation.y
+    while (delta > Math.PI) delta -= Math.PI * 2
+    while (delta < -Math.PI) delta += Math.PI * 2
+    group.current.rotation.y += delta * Math.min(1, dt * 3)
+  })
+
+  return (
+    <group ref={group}>
+      <CharacterMesh look={look} THREEmod={THREE} />
+    </group>
+  )
+}
+
 const QuestMarkers = () => {
   const groupRefs = useRef<Array<THREE.Group | null>>([])
 
@@ -73,18 +112,9 @@ const QuestMarkers = () => {
     <group>
       {QUEST_GIVERS.map((npc, i) => (
         <group key={npc.id} position={[npc.x, 0, npc.z]}>
-          <mesh position={[0, 1.02, 0]} castShadow>
-            <capsuleGeometry args={[0.31, 0.72, 6, 12]} />
-            <meshStandardMaterial color={i % 2 === 0 ? WORLD.facadeRose : WORLD.facadeSlate} roughness={0.85} />
-          </mesh>
-          <mesh position={[0, 1.62, 0]} castShadow>
-            <sphereGeometry args={[0.23, 14, 12]} />
-            <meshStandardMaterial color={WORLD.facadeWarm} roughness={0.8} />
-          </mesh>
-          <mesh position={[0, 1.85, 0]} castShadow>
-            <coneGeometry args={[0.44, 0.2, 16]} />
-            <meshStandardMaterial color={WORLD.facadeCream} roughness={0.9} />
-          </mesh>
+          {/* Same rig as the player, so an NPC and the player read as the same
+              species. Appearance is keyed by NPC id: stable across reloads. */}
+          <NpcFigure npcId={npc.id} />
           <group
             ref={(el) => {
               groupRefs.current[i] = el
@@ -102,49 +132,101 @@ const QuestMarkers = () => {
   )
 }
 
+/**
+ * The crowd. Still instanced — 40 people in 4 draw calls — but now built from the
+ * same anatomy as the rig: legs, torso with a shoulder line, head, hair. The old
+ * version was a capsule plus a sphere per figure, which at the new player scale
+ * looked like a field of bowling pins.
+ *
+ * Height, colour and hair darkness are seeded per index, so the street is not a
+ * clone parade. Nobody walks: a static standing crowd at this budget reads as
+ * "people paused on the pavement", which is what an old quarter looks like anyway.
+ */
 const Villagers = () => {
+  const legs = useRef<THREE.InstancedMesh>(null)
   const bodies = useRef<THREE.InstancedMesh>(null)
   const heads = useRef<THREE.InstancedMesh>(null)
+  const hairs = useRef<THREE.InstancedMesh>(null)
+
+  // derived once: legs/torso/head are placed by their bottoms, not their centres
+  const slot = useMemo(() => crowdSlot(), [])
+
   const spots = useMemo(
     () =>
-      TREES.slice(0, 40).map((t, i) => ({
-        x: t.x + ((i % 3) - 1) * 3.4,
-        z: t.z + ((i % 5) - 2) * 2.6,
-        yaw: (i * 1.37) % 6.28,
-        color: [WORLD.personA, WORLD.personB, WORLD.personC, WORLD.personD][i % 4],
-      })),
+      TREES.slice(0, 40).map((t, i) => {
+        const look = appearanceFor(`crowd-${i}`)
+        return {
+          x: t.x + ((i % 3) - 1) * 3.4,
+          z: t.z + ((i % 5) - 2) * 2.6,
+          yaw: (i * 1.37) % 6.28,
+          scale: look.stature,
+          shirt: GARMENTS[look.garment].top,
+          trousers: GARMENTS[look.garment].bottom,
+          hair: hairColor(look.tone),
+        }
+      }),
     [],
   )
 
   useLayoutEffect(() => {
-    if (!bodies.current || !heads.current) return
+    if (!legs.current || !bodies.current || !heads.current || !hairs.current) return
     const m = new THREE.Matrix4()
     const q = new THREE.Quaternion()
     const p = new THREE.Vector3()
-    const sc = new THREE.Vector3(1, 1, 1)
+    const sc = new THREE.Vector3()
     const c = new THREE.Color()
+    const up = new THREE.Vector3(0, 1, 0)
+
     spots.forEach((s, i) => {
-      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), s.yaw)
-      m.compose(p.set(s.x, 0.92, s.z), q, sc)
+      q.setFromAxisAngle(up, s.yaw)
+      sc.set(s.scale, s.scale, s.scale)
+
+      // legs: a single tapered pair, low enough to read as two legs from behind
+      m.compose(p.set(s.x, slot.legsY, s.z), q, sc)
+      legs.current?.setMatrixAt(i, m)
+      legs.current?.setColorAt(i, c.set(s.trousers))
+
+      m.compose(p.set(s.x, slot.torsoY, s.z), q, sc)
       bodies.current?.setMatrixAt(i, m)
-      bodies.current?.setColorAt(i, c.set(s.color))
-      m.compose(p.set(s.x, 1.44, s.z), q, sc)
+      bodies.current?.setColorAt(i, c.set(s.shirt))
+
+      m.compose(p.set(s.x, slot.headY, s.z), q, sc)
       heads.current?.setMatrixAt(i, m)
+
+      m.compose(p.set(s.x, slot.hairY, s.z), q, sc)
+      hairs.current?.setMatrixAt(i, m)
+      hairs.current?.setColorAt(i, c.set(s.hair))
     })
-    bodies.current.instanceMatrix.needsUpdate = true
-    heads.current.instanceMatrix.needsUpdate = true
-    if (bodies.current.instanceColor) bodies.current.instanceColor.needsUpdate = true
-  }, [spots])
+
+    for (const mesh of [legs.current, bodies.current, heads.current, hairs.current]) {
+      mesh.instanceMatrix.needsUpdate = true
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+    }
+  }, [spots, slot])
 
   return (
     <group>
-      <instancedMesh ref={bodies} args={[undefined, undefined, spots.length]} castShadow>
-        <capsuleGeometry args={[0.26, 0.62, 5, 10]} />
+      {/* legs: one capsule per figure, in trouser colour */}
+      <instancedMesh ref={legs} args={[undefined, undefined, spots.length]} castShadow>
+        <capsuleGeometry args={[0.075, RIG.legH - 0.14, 4, 6]} />
         <meshStandardMaterial roughness={0.95} />
       </instancedMesh>
+
+      {/* torso: capsule is the cheapest shape with a shoulder line once it is scaled
+          wider than it is deep — done through the geometry, not the matrix */}
+      <instancedMesh ref={bodies} args={[undefined, undefined, spots.length]} castShadow>
+        <capsuleGeometry args={[0.17, RIG.torsoH * 0.72, 4, 8]} />
+        <meshStandardMaterial roughness={0.93} />
+      </instancedMesh>
+
       <instancedMesh ref={heads} args={[undefined, undefined, spots.length]} castShadow>
-        <sphereGeometry args={[0.2, 12, 10]} />
-        <meshStandardMaterial color={WORLD.skinWarm} roughness={0.9} />
+        <sphereGeometry args={[RIG.headR, 10, 8]} />
+        <meshStandardMaterial color={WORLD.skinWarm} roughness={0.85} />
+      </instancedMesh>
+
+      <instancedMesh ref={hairs} args={[undefined, undefined, spots.length]} castShadow>
+        <sphereGeometry args={[RIG.headR * 1.04, 8, 6]} />
+        <meshStandardMaterial roughness={0.92} />
       </instancedMesh>
     </group>
   )

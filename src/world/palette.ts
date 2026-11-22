@@ -81,6 +81,9 @@ export const WORLD = {
 
   // scene extras (all colours the render layer references)
   skinWarm: '#DDB894',
+  skinDeep: '#C08F63',
+  primaryDeep: '#2A9A37',
+  hairWarm: '#4A2B22',
   groundShade: '#5C6B48',
   islandGrass: '#93A06F',
   pavilionWall: '#B9A98A',
