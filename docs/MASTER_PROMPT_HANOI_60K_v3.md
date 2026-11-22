@@ -288,7 +288,7 @@ model Npc / QuestDef / QuestInstance / Reputation / WardrobeItem / Housing / Pho
 |---|---|---|---|
 | 1 | Core loop + Hoàn Kiếm + nhân vật + save | 9.000 | Vào game < 8 s, 60 FPS — **đã đạt 6.111** |
 | **1.5** | ~~Trả nợ~~ **XONG 2026-11-21** — xem `docs/adr/ADR-004-phase-1-5-debt-gates.md`: xoá legacy, xoá 2 hệ token chết, 7 cổng CI, ErrorBoundary + WebGL fallback, schema Prisma viết lại, giá server-side, reset income cap, contrast AA, focus ring, safe-area, bundle tách tầng | **−1.500 (xoá) +2.100** | ✅ 7/7 cổng xanh; 0 hex ngoài palette; 84 test; shell 104 kB |
-| 2 | POI/shop/dialogue + nghề phở + needs + journal + audio | 9.000 | Chơi 30 phút có mục tiêu |
+| **2** | **XONG 2026-11-21** — RP-04 nghề phở (timing+thứ tự, 4 mini-game còn lại ở P3), RP-03 vệ sinh (meter + 33 vòi nước), RP-08 nhật ký tự sinh (7 loại event, cap 60, stats trọn đời), CORE-07 audio bus (3 bus + ducking + 6 profile ambience), Settings thật, Content Bible 36 phố, tên POI 64→160, save v2 + migration | **+2.100** | ✅ 159 test; 7/7 cổng xanh; chơi 30 phút có mục tiêu |
 | 3 | Quest graph + 15 quest + 30 NPC + reputation | 8.000 | Xong 1 chain main |
 | 4 | Economy + ledger + shop + save cloud + auth + IAP | 8.000 | Mua bán không thể duplicate |
 | 5 | Mở đủ 20 km² + 12 landmark + map + transit | 9.000 | Đi hết map không crash; gate phủ 100% |
