@@ -4,6 +4,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useGameStore } from '@game/store'
 import { POIS } from '@world/data/hoanKiem'
 import { CozyApp } from '@game/CozyApp'
+import { clearSave } from '@game/save'
 
 // The 3D canvas needs WebGL, which jsdom does not provide. Everything else is real.
 vi.mock('@game/scene/Scene', () => ({ Scene: () => <div data-testid="scene" /> }))
@@ -99,5 +100,38 @@ describe('UI shell (design system)', () => {
     expect(screen.getByText('Tạm dừng')).toBeTruthy()
     fireEvent.click(screen.getByText('Tiếp tục'))
     expect(useGameStore.getState().phase).toBe('PLAYING')
+  })
+})
+
+/**
+ * Settings (Phase 2). Before this, `settings` lived in the store and the save but
+ * nothing in the UI could change it — reduceMotion was even hard-coded false.
+ */
+describe('settings panel', () => {
+  it('opens from the gear button and closes again', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    clearSave()
+    useGameStore.setState({ phase: 'PLAYING', dialogue: null, journalOpen: false, mapOpen: false })
+    render(<CozyApp />)
+
+    await user.click(screen.getByRole('button', { name: 'Cài đặt' }))
+    expect(screen.getByRole('dialog', { name: 'Cài đặt' })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Xong' }))
+    expect(screen.queryByRole('dialog', { name: 'Cài đặt' })).toBeNull()
+  })
+
+  it('writes both toggles through to the store', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    clearSave()
+    useGameStore.setState({ phase: 'PLAYING', settings: { reduceMotion: false, sfx: true, language: 'vi' } })
+    render(<CozyApp />)
+
+    await user.click(screen.getByRole('button', { name: 'Cài đặt' }))
+    await user.click(screen.getByRole('switch', { name: 'Giảm chuyển động' }))
+    await user.click(screen.getByRole('switch', { name: 'Âm thanh' }))
+
+    expect(useGameStore.getState().settings.reduceMotion).toBe(true)
+    expect(useGameStore.getState().settings.sfx).toBe(false)
   })
 })

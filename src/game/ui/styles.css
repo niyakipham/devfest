@@ -1563,6 +1563,105 @@ input:focus-visible,
   font-size: var(--t-caption);
 }
 
+
+/* =============================== SETTINGS =============================== */
+.settings {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(430px, 92vw);
+  display: grid;
+  gap: 10px;
+  z-index: 9;
+}
+
+.settings__title {
+  margin: 0 0 2px;
+  font-size: var(--t-h2);
+  font-weight: 900;
+  color: var(--c-ink);
+}
+
+.settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--r-slab);
+  background: var(--c-sunken);
+  cursor: pointer;
+}
+
+.settings__row--static {
+  cursor: default;
+}
+
+.settings__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings__copy strong {
+  font-size: var(--t-body);
+  font-weight: 800;
+  color: var(--c-ink);
+}
+
+.settings__copy small {
+  font-size: var(--t-caption);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--c-ink-muted);
+}
+
+.settings__value {
+  font-size: var(--t-caption);
+  font-weight: 800;
+  color: var(--c-ink-soft);
+}
+
+/* native checkbox, restyled as an iOS-style switch but still keyboard-operable */
+.settings__input {
+  appearance: none;
+  width: 48px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--r-pill);
+  background: var(--c-line-soft);
+  position: relative;
+  cursor: pointer;
+  transition: background var(--d-fast) linear;
+}
+
+.settings__input::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-pill);
+  background: var(--c-ink-on-dark);
+  box-shadow: 0 1px 3px var(--c-line-strong);
+  transition: transform var(--d-fast) var(--e-pop);
+}
+
+.settings__input:checked {
+  background: var(--c-primary);
+}
+
+.settings__input:checked::after {
+  transform: translateX(20px);
+}
+
+.settings__input:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 3px;
+}
+
 /* ============================ RESPONSIVE ============================== */
 
 @media (max-width: 900px) {

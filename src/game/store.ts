@@ -24,6 +24,7 @@ import {
   type JournalEntry,
   type JournalStats,
 } from '@rp/journal'
+import { audioBus } from './audio/bus'
 import { readSave, writeSave } from './save'
 import { playerRef, resetPlayerRef } from './world-ref'
 
@@ -285,6 +286,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       earnedToday: rolled ? 0 : get().earnedToday,
     })
     if (rolled) {
+      audioBus.bell()
       set({ journal: appendEntry(get().journal, dayEntry(day, makeEntryId)) })
       get().addToast({
         title: `Ngày ${day} bắt đầu`,
@@ -320,6 +322,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const key = poi.action.slice('dialogue:'.length)
       if (DIALOGUES[key]) {
         set({ dialogue: { key, poiId: poi.id } })
+        audioBus.setDuck(true)
+        cue(get, 'page')
         get().logMeet(poi.name, poi.district)
         return
       }
@@ -343,6 +347,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           },
         },
       })
+      cue(get, 'confirm')
       get().logEat(poi.name, price)
       get().addToast({ title: `Đã mua ${poi.name}`, message: `−${price}đ · ăn ngon miệng`, tone: 'info' })
       if (quests['q-pho']?.state === 'ACTIVE') completeQuest(set, get, 'q-pho')
@@ -399,6 +404,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     if (poi.action === 'shrine' || poi.type === 'SHRINE') {
+      if (get().settings.sfx) audioBus.bell()
       const { player } = get()
       set({ player: { ...player, needs: { ...player.needs, mood: Math.min(100, player.needs.mood + 6) } } })
       get().addToast({ title: poi.name, message: 'Bạn thắp một nén hương. Lòng nhẹ đi.', tone: 'info' })
@@ -478,7 +484,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
-  closeDialogue: () => set({ dialogue: null }),
+  closeDialogue: () => {
+    // unduck before closing so music ramps back up with the box fading out
+    audioBus.setDuck(false)
+    set({ dialogue: null })
+  },
 
   toggleJournal: () => set({ journalOpen: !get().journalOpen, mapOpen: false }),
 
@@ -609,6 +619,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }, makeEntryId)
     set({ stats: logged.stats, journal: appendEntry(get().journal, logged.entry) })
 
+    cue(get, result.perfect ? 'perfect' : 'confirm')
     get().addToast({
       title: result.perfect ? 'Bát phở hoàn hảo!' : 'Xong một bát',
       message: `${result.verdict} ${net >= 0 ? `+${net}đ` : `${net}đ`} · +${result.xp} XP`,
@@ -678,6 +689,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
 }))
 
+/**
+ * Audio cue helper. Settings gate the bus (a muted game must not even build the
+ * graph), and every call is a no-op when Web Audio is unavailable.
+ */
+const cue = (get: () => GameStore, name: Parameters<typeof audioBus.cue>[0]): void => {
+  if (!get().settings.sfx) return
+  audioBus.cue(name)
+}
+
 /** Shared by direct interactions and dialogue effects. */
 const completeQuest = (
   set: (partial: Partial<GameStore>) => void,
@@ -724,6 +744,7 @@ const completeQuest = (
     set({ stats: earned.stats, journal: appendEntry(get().journal, earned.entry) })
   }
 
+  cue(get, 'coin')
   get().addToast({
     title: `Hoàn thành: ${def.title}`,
     message: `${def.reward.piece ? 'Một mảnh ký ức mới. ' : ''}${cappedDong > 0 ? `+${cappedDong}đ · ` : ''}+${def.reward.xp} XP nghề`,
