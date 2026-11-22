@@ -4,6 +4,8 @@
  * client and server both validate with these exact schemas.
  */
 import { z } from 'zod'
+import { StreakStateSchema, EMPTY_STREAK } from '../streak'
+import { CompanionStateSchema } from '../companion'
 
 export const Vec3 = z.object({ x: z.number(), y: z.number(), z: z.number() })
 export type Vec3 = z.infer<typeof Vec3>
@@ -84,11 +86,11 @@ export const JournalStatsSchema = z.object({
 })
 export type JournalStatsSchema = z.infer<typeof JournalStatsSchema>
 
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 
 /** Legacy shape, kept only so the v1→v2 migration can be tested against it. */
 export const SaveGameV1 = z.object({
-  version: z.literal(2),
+  version: z.literal(3),
   slot: z.number().int().min(0).max(2),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -122,6 +124,10 @@ export const SaveGameV1 = z.object({
     tilesSeen: [],
   }),
   metNpcs: z.array(z.string()).max(120).default([]),
+  /** Streak (v3): consecutive-day milestone state. Optional with default. */
+  streak: StreakStateSchema.default(EMPTY_STREAK),
+  /** Companion (v3): the animal-spirit the player keeps. Optional with default. */
+  companion: CompanionStateSchema.nullable().default(null),
 })
 export type SaveGameV1 = z.infer<typeof SaveGameV1>
 
@@ -135,12 +141,12 @@ export const migrateSave = (raw: unknown): SaveGameV1 | null => {
   if (typeof raw !== 'object' || raw === null) return null
   const version = (raw as { version?: unknown }).version
 
-  if (version === 1) {
-    const upgraded = {
-      ...(raw as Record<string, unknown>),
-      version: 2,
-      journal: [],
-      stats: {
+  if (version === 1 || version === 2) {
+    const upgraded: Record<string, unknown> = { ...(raw as Record<string, unknown>), version: 3 }
+    // v1 → v2: journal/stats/metNpcs are absent in early saves.
+    if (version === 1) {
+      upgraded.journal = []
+      upgraded.stats = {
         metresWalked: 0,
         bowlsEaten: 0,
         bowlsBrewed: 0,
@@ -148,15 +154,22 @@ export const migrateSave = (raw: unknown): SaveGameV1 | null => {
         photosTaken: 0,
         dongEarned: 0,
         tilesSeen: [],
-      },
-      metNpcs: [],
+      }
+      upgraded.metNpcs = []
     }
+    // v2 → v3: streak/companion are new and optional — defaults fill in.
+    upgraded.streak = EMPTY_STREAK
+    upgraded.companion = null
     const parsed = SaveGameV1.safeParse(upgraded)
     return parsed.success ? parsed.data : null
   }
 
-  const parsed = SaveGameV1.safeParse(raw)
-  return parsed.success ? parsed.data : null
+  if (version === 3) {
+    const parsed = SaveGameV1.safeParse(raw)
+    return parsed.success ? parsed.data : null
+  }
+
+  return null
 }
 
 export const AuthRegister = z.object({
@@ -171,15 +184,45 @@ export const AuthLogin = z.object({
   password: z.string().min(1).max(72),
 })
 
+/**
+ * The push body: outer shape only. The save payload itself is deliberately
+ * `unknown` here — an older client still pushes a v1/v2 payload, and the
+ * server migrates it in place (SaveService → migrateSave). Validating the
+ * literal schema before reaching the migration would reject exactly the
+ * players the migration exists to save.
+ */
 export const SavePushRequest = z.object({
   slot: z.number().int().min(0).max(2),
-  save: SaveGameV1,
+  save: z.unknown(),
 })
 
 export const WorldTileRequest = z.object({
   x: z.coerce.number().int().min(0),
   z: z.coerce.number().int().min(0),
 })
+
+/* --------------------- Phase 4: quest & voucher lifecycle --------------------- */
+
+export const QuestStartRequest = z.object({
+  questId: z.string().min(1).max(64),
+  expiresAt: z.string().nullable().default(null),
+})
+export type QuestStartRequest = z.infer<typeof QuestStartRequest>
+
+export const QuestCompleteRequest = z.object({
+  questId: z.string().min(1).max(64),
+})
+export type QuestCompleteRequest = z.infer<typeof QuestCompleteRequest>
+
+export const QuestClaimRequest = z.object({
+  questId: z.string().min(1).max(64),
+})
+export type QuestClaimRequest = z.infer<typeof QuestClaimRequest>
+
+export const VoucherClaimRequest = z.object({
+  voucherId: z.string().min(1).max(64),
+})
+export type VoucherClaimRequest = z.infer<typeof VoucherClaimRequest>
 
 /** Socket / API error shape — one shape everywhere. */
 export const ApiError = z.object({

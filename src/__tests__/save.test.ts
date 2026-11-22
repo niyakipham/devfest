@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { clearSave, hasSave, readSave, writeSave } from '@game/save'
 import { migrateSave } from '@shared/contracts'
 import type { SaveGameV1 } from '@shared/contracts'
+import { EMPTY_STREAK } from '@shared/streak'
 
 const makeSave = (name = 'Minh'): SaveGameV1 => ({
-  version: 2,
+  version: 3,
   slot: 0,
   createdAt: '2026-11-21T05:00:00.000Z',
   updatedAt: '2026-11-21T05:10:00.000Z',
@@ -28,6 +29,8 @@ const makeSave = (name = 'Minh'): SaveGameV1 => ({
   journal: [],
   stats: { metresWalked: 0, bowlsEaten: 0, bowlsBrewed: 0, npcsMet: 0, photosTaken: 0, dongEarned: 0, tilesSeen: [] },
   metNpcs: [],
+  streak: EMPTY_STREAK,
+  companion: null,
 })
 
 describe('save system', () => {
@@ -86,7 +89,7 @@ describe('save migration v1 → v2', () => {
 
     const migrated = migrateSave(v1)
     expect(migrated).not.toBeNull()
-    expect(migrated!.version).toBe(2)
+    expect(migrated!.version).toBe(3)
     expect(migrated!.player.name).toBe('Minh')
     expect(migrated!.pieces).toEqual(['piece-01'])
     expect(migrated!.journal).toEqual([])
@@ -103,8 +106,51 @@ describe('save migration v1 → v2', () => {
     store!.setItem('hanoi-legends:save:v1', JSON.stringify(v1))
 
     const loaded = readSave()
-    expect(loaded?.version).toBe(2)
+    expect(loaded?.version).toBe(3)
     expect(loaded?.player.name).toBe('Minh')
+  })
+
+  it('upgrades a v2 payload in place (v2 → v3)', () => {
+    const v2 = {
+      version: 2,
+      slot: 0,
+      createdAt: '2026-11-21T05:00:00.000Z',
+      updatedAt: '2026-11-21T05:10:00.000Z',
+      player: {
+        name: 'Minh',
+        persona: 'PHO_VENDOR',
+        position: { x: 2460, y: 0, z: 2010 },
+        yaw: Math.PI,
+        needs: { energy: 70, hunger: 40, mood: 55, hygiene: 80 },
+        dong: 150,
+        hoaSen: 0,
+        craftLevel: 1,
+        craftXp: 20,
+        reputation: { merchant: 2 },
+      },
+      quests: [{ key: 'q-pho', state: 'ACTIVE', objectives: { eat: 0 } }],
+      pieces: ['piece-01'],
+      clock: { minutes: 340, day: 1, season: 'DONG' },
+      settings: { reduceMotion: false, sfx: true, language: 'vi' },
+      journal: [],
+      stats: { metresWalked: 0, bowlsEaten: 0, bowlsBrewed: 0, npcsMet: 0, photosTaken: 0, dongEarned: 0, tilesSeen: [] },
+      metNpcs: [],
+    }
+
+    const migrated = migrateSave(v2)
+    expect(migrated).not.toBeNull()
+    expect(migrated!.version).toBe(3)
+    expect(migrated!.player.name).toBe('Minh')
+    expect(migrated!.streak.count).toBe(0) // EMPTY_STREAK default
+    expect(migrated!.companion).toBeNull() // companion adoption is opt-in
+  })
+
+  it('keeps an already-valid v3 save untouched', () => {
+    const v3 = makeSave()
+    const parsed = migrateSave(v3)
+    expect(parsed).not.toBeNull()
+    expect(parsed!.streak.count).toBe(0)
+    expect(parsed!.companion).toBeNull()
   })
 
   it('rejects a payload that is not an object at all', () => {

@@ -36,7 +36,13 @@ npm run check     # typecheck + 56 test + cổng mật độ thế giới
 | **Save** | Zod-validated schema v1, localStorage offline-first, từ chối save hỏng/version lạ, autosave 3 phút |
 | **API** | Auth JWT + bcrypt, save 3 slot, world tile/POI, wallet **double-entry ledger** với idempotency, rate limit, RBAC sẵn khung |
 
-**Chưa có (theo roadmap):** nghề & mini-game (Phase 2), economy UI + thanh toán (Phase 4), mở rộng đủ 12 quận
+**Đã có trong Phase 4 — Quest State Machine + Voucher Engine (STEP 1 tiếp tục):** `shared/quest-machine.ts` (LOCKED→AVAILABLE→ACTIVE→COMPLETE→CLAIMED/FAILED, idempotent, chỉ transition hợp lệ, objectives phải đạt 1.0) · `server/services/quests.ts` (rewards table, ledger-grant dong idempotent, daily cap Free=3/Pro=6) · `shared/voucher.ts` (issue→claim→redeem, payout, cap; jamais wallet debit — status-move only) · HTTP endpoints `POST /api/quests/:id/start|complete|claim` + `GET /api/quests/:id` + `GET /api/vouchers` + `POST /api/vouchers/:id/claim`. Chi tiết: `docs/PHASE3_MAP_ATMOSPHERE.md` (phần Phase 4).
+
+**Đã có trong Phase 3 — Map/Atmosphere (STEP 1 tiếp tục):** `world/scale.ts` (5 reference legs, tolerance band — báo cáo sai phải trong CI) · `shared/route.ts` (honest 2D route — thẳng + nearest street + walk-time) · `shared/weather.ts` (deterministic offline weather — 4 mùa × điều kiện + `blocksQuest` + TTL cache) · `world/registry.ts` (12 quận derived từ data thật — streets/POI/landmark counts + phase-1 completion report). Chi tiết: `docs/PHASE3_MAP_ATMOSPHERE.md`
+
+**Đã có trong Phase 2 — Core Engine (STEP 1):** `streak.ts` (consecutive-day + milestone day-7 + Pro weekly freeze) · `companion.ts` (4 loài theo Content Bible, 3 care action, idempotent, never dies) · `quest-engine.ts` (daily quest selection, claim budget free=3/Pro=6, expiry check) · `gamification.ts` (5 phe reputation clamp ±100, leaderboard snapshot, 36 pieces/phố) · save schema v2→v3 (migration in place) · game store wiring (`adoptCompanion` / `careCompanion` / `claimStreakDay`). Chi tiết: `docs/PHASE2_CORE_ENGINE.md`
+
+**Chưa có (theo roadmap):** nghề & mini-game (Phase 2+ UI), economy UI + thanh toán (Phase 4), mở rộng đủ 12 quận
 (Phase 5), photo mode + Pieces (Phase 6), multiplayer 32 người (Phase 7), CMS (Phase 8).
 
 ---
