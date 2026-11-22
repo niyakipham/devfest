@@ -136,6 +136,14 @@ const SHOP_TYPES_BY_CRAFT: Record<string, PoiType> = {
   'Khách sạn': 'SHOP',
 }
 
+/**
+ * Small shop-name parts, combined deterministically so two shops on the same
+ * street are not clones. A real old-quarter sign is usually "noun + branch":
+ * "Hiệu vàng Kim Ngân", "Quán phở Thìn", "Hiệu sách cũ số 12".
+ */
+const HOUSE_DETAILS = ['góc phố', 'trong ngõ', 'số lẻ', 'số chẵn', 'tầng hai', 'sát hồ', 'cuối phố'] as const
+const VIEW_DETAILS = ['nhìn ra hồ', 'phía đông', 'phía tây', 'bóng cây', 'lúc sáng sớm', 'góc ngã tư'] as const
+
 const CRAFT_SHOP_NAMES: Record<string, string[]> = {
   'Cà phê': ['Cà phê trứng', 'Cà phê sữa đá', 'Quán cà phê ban công', 'Cà phê vỉa hè'],
   'Lụa': ['Tiệm lụa Hà Đông', 'Cửa hàng áo dài', 'Khăn lụa tơ tằm'],
@@ -177,7 +185,18 @@ const buildStreetPois = (): Poi[] => {
 
       const type = SHOP_TYPES_BY_CRAFT[street.craft] ?? 'SHOP'
       const names = CRAFT_SHOP_NAMES[street.craft] ?? [street.craft]
-      const name = names[Math.floor(rng() * names.length)]
+      // F7: 311 POIs used to share 64 names, so half the old quarter was called
+      // "Cà phê trứng". Qualifying with the street raises distinct names to
+      // ~200 without inventing a new content pipeline.
+      const base = names[Math.floor(rng() * names.length)]
+      // Only a shop has an address. A photo spot has a *view*, a landmark has a
+      // side of the street — "Hồ Gươm · số lẻ" was nonsense the density gate
+      // could not see.
+      const qualifier =
+        type === 'SHOP' || type === 'WORKSHOP'
+          ? HOUSE_DETAILS[Math.floor(rng() * HOUSE_DETAILS.length)]
+          : VIEW_DETAILS[Math.floor(rng() * VIEW_DETAILS.length)]
+      const name = `${base} · ${qualifier} ${street.name}`
       const { tx, tz } = pointToTile(px, pz)
       pois.push({
         id: `poi-${street.id}-${index}`,

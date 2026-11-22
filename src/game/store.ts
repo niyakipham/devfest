@@ -7,6 +7,7 @@ import type { Needs, Persona, PlayerSnapshot, QuestProgress, SaveGameV1 } from '
 import { addCraftXp, decayNeeds, FOOD, applyIncomeCap, dailyIncomeCap } from '@shared/formulas'
 import { PHO_STAGES, brewBowl, bowlsPerDay, ingredientCost, minutesPerBowl, type BrewResult, type Garnish } from '@rp/craft/pho'
 import { POIS, SPAWN, nearestPoi } from '@world/data/hoanKiem'
+import { loreFor, loreLine } from '@world/data/lore'
 import type { Poi } from '@world/types'
 import { QUESTS, questByKey } from './content/quests'
 import { DIALOGUES } from './content/dialogue'
@@ -411,9 +412,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return
     }
 
+    // F7: every street has its own line from the Content Bible. The old fallback
+    // ("Một chỗ nhỏ, nhưng có chuyện để kể") appeared on 200+ POIs and is exactly
+    // the "Hà Nội sáo rỗng" the audit called out.
+    const lore = loreFor(poi.street)
+    if (lore) {
+      get().logMeet(poi.name, poi.district)
+      get().addToast({ title: poi.name, message: lore.line, tone: 'info' })
+      return
+    }
+
     get().addToast({
       title: poi.name,
-      message: poi.craft ? `Phố này xưa làm nghề ${poi.craft.toLowerCase()}.` : 'Một chỗ nhỏ, nhưng có chuyện để kể.',
+      message: loreLine(undefined, poi.street),
       tone: 'info',
     })
   },
