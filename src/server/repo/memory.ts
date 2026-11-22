@@ -4,6 +4,8 @@
  * swapping the store must not change a single route or service.
  */
 import type { SaveGameV1 } from '@shared/contracts'
+import type { QuestRecord } from '@shared/quest-machine'
+import type { VoucherRecord } from '@shared/voucher'
 
 export interface UserRecord {
   id: string
@@ -42,6 +44,17 @@ export class MemoryStore {
   ledger: LedgerLineRecord[] = []
   transactions = new Map<string, string[]>()
   idempotency = new Map<string, LedgerLineRecord[]>()
+
+  /** key: `${userId}:${questId}` → quest record */
+  quests = new Map<string, QuestRecord>()
+  /** key: `${userId}:${voucherId}` → voucher record */
+  vouchers = new Map<string, VoucherRecord>()
+  /** per-user per-day claim counters: `${userId}:${YYYY-MM-DD}` → number */
+  questClaimsToday = new Map<string, number>()
+
+  questKey(userId: string, questId: string): string { return `${userId}:${questId}` }
+  voucherKey(userId: string, voucherId: string): string { return `${userId}:${voucherId}` }
+  claimKey(userId: string, dateICT: string): string { return `${userId}:${dateICT}` }
 
   createUser(input: Omit<UserRecord, 'id' | 'createdAt'>): UserRecord {
     const user: UserRecord = { ...input, id: id('usr'), createdAt: new Date().toISOString() }

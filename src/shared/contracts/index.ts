@@ -201,6 +201,29 @@ export const WorldTileRequest = z.object({
   z: z.coerce.number().int().min(0),
 })
 
+/* --------------------- Phase 4: quest & voucher lifecycle --------------------- */
+
+export const QuestStartRequest = z.object({
+  questId: z.string().min(1).max(64),
+  expiresAt: z.string().nullable().default(null),
+})
+export type QuestStartRequest = z.infer<typeof QuestStartRequest>
+
+export const QuestCompleteRequest = z.object({
+  questId: z.string().min(1).max(64),
+})
+export type QuestCompleteRequest = z.infer<typeof QuestCompleteRequest>
+
+export const QuestClaimRequest = z.object({
+  questId: z.string().min(1).max(64),
+})
+export type QuestClaimRequest = z.infer<typeof QuestClaimRequest>
+
+export const VoucherClaimRequest = z.object({
+  voucherId: z.string().min(1).max(64),
+})
+export type VoucherClaimRequest = z.infer<typeof VoucherClaimRequest>
+
 /** Socket / API error shape — one shape everywhere. */
 export const ApiError = z.object({
   error: z.string(),

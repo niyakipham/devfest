@@ -4,7 +4,7 @@
  */
 import express, { type NextFunction, type Request, type Response } from 'express'
 import cors from 'cors'
-import { AuthLogin, AuthRegister, SavePushRequest } from '@shared/contracts'
+import { AuthLogin, AuthRegister, SavePushRequest, QuestStartRequest, QuestClaimRequest, VoucherClaimRequest } from '@shared/contracts'
 import { CATALOG, findSku } from '@shared/catalog'
 import { POIS } from '@world/data/hoanKiem'
 import { TILE_SIZE, tileAt, tileBounds } from '@world/grid'
@@ -12,6 +12,9 @@ import { memoryStore } from './repo/memory'
 import { AuthError, AuthService } from './services/auth'
 import { LedgerError, LedgerService } from './services/ledger'
 import { SaveError, SaveService } from './services/save'
+import { QuestServiceImpl } from './services/quests'
+import { VoucherService } from './services/vouchers'
+import { QuestMachineError } from '@shared/quest-machine'
 
 const WINDOW_MS = 60_000
 const MAX_REQUESTS = 60
@@ -47,6 +50,8 @@ export const createApp = () => {
   const auth = new AuthService(memoryStore)
   const saves = new SaveService(memoryStore)
   const ledger = new LedgerService(memoryStore)
+  const quests = new QuestServiceImpl(memoryStore, ledger)
+  const vouchers = new VoucherService(memoryStore)
 
   app.set('trust proxy', true)
   app.use(cors())
@@ -143,6 +148,96 @@ export const createApp = () => {
     }
   })
 
+  /* ------------------------------- QUESTS -------------------------------- */
+  app.post('/api/quests/:id/start', requireUser, (req, res, next) => {
+    try {
+      const { questId, expiresAt } = QuestStartRequest.parse({ questId: req.params.id, ...req.body })
+      const record = quests.start(res.locals.user.id, questId, { expiresAt: expiresAt ?? null })
+      res.status(201).json(record)
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  app.post('/api/quests/:id/complete', requireUser, (req, res, next) => {
+    try {
+      const { questId } = QuestClaimRequest.parse({ questId: req.params.id, ...req.body })
+      const record = quests.complete(res.locals.user.id, questId)
+      res.json(record)
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  app.post('/api/quests/:id/claim', requireUser, (req, res, next) => {
+    try {
+      const { questId } = QuestClaimRequest.parse({ questId: req.params.id, ...req.body })
+      const pro = req.body?.pro === true
+      const result = quests.claim(res.locals.user.id, questId, { pro })
+      if (result.reason === 'not-complete') {
+        res.status(400).json({ error: 'quest not complete', code: 'NOT_COMPLETE' })
+        return
+      }
+      if (result.reason === 'expired') {
+        res.status(410).json({ error: 'quest expired', code: 'EXPIRED' })
+        return
+      }
+      if (result.reason === 'budget-exhausted') {
+        res.status(429).json({ error: 'daily claim budget exhausted', code: 'BUDGET_EXHAUSTED' })
+        return
+      }
+      res.json(result)
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  app.get('/api/quests/:id', requireUser, (req, res, next) => {
+    try {
+      const record = quests.get(res.locals.user.id, req.params.id)
+      if (!record) {
+        res.status(404).json({ error: 'quest not found', code: 'NOT_FOUND' })
+        return
+      }
+      res.json({ record })
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  /* ----------------------------- VOUCHERS ----------------------------- */
+  app.get('/api/vouchers', requireUser, (_req, res, next) => {
+    try {
+      const list = vouchers.list(res.locals.user.id)
+      res.json({ vouchers: list })
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  app.post('/api/vouchers/:id/claim', requireUser, (req, res, next) => {
+    try {
+      const { voucherId } = VoucherClaimRequest.parse({ voucherId: req.params.id, ...req.body })
+      const pro = req.body?.pro === true
+      const outcome = vouchers.claim(res.locals.user.id, voucherId, { pro })
+      if (!outcome) {
+        res.status(404).json({ error: 'voucher not found', code: 'NOT_FOUND' })
+        return
+      }
+      if (outcome.reason === 'budget-exhausted') {
+        res.status(429).json({ error: 'daily voucher budget exhausted', code: 'BUDGET_EXHAUSTED' })
+        return
+      }
+      if (outcome.reason === 'expired') {
+        res.status(410).json({ error: 'voucher expired', code: 'EXPIRED' })
+        return
+      }
+      res.json(outcome)
+    } catch (err) {
+      next(err)
+    }
+  })
+
   app.get('/api/save/:slot', requireUser, (req, res) => {
     const slot = Number(req.params.slot)
     const save = saves.pull(res.locals.user.id, slot)
@@ -198,6 +293,10 @@ export const createApp = () => {
       return
     }
     if (err instanceof SaveError) {
+      res.status(400).json({ error: err.message, code: err.code })
+      return
+    }
+    if (err instanceof QuestMachineError) {
       res.status(400).json({ error: err.message, code: err.code })
       return
     }
