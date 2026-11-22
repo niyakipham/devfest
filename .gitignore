@@ -35,3 +35,7 @@ prisma/migrations/
 # Cache
 .cache/
 .temp/
+
+# local preview renders + tool output (regenerate with scripts/preview-character.ts)
+.arena/
+image-search/

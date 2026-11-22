@@ -10,12 +10,17 @@ export default defineConfig({
       '@shared': path.resolve(__dirname, './src/shared'),
       '@world': path.resolve(__dirname, './src/world'),
       '@rp': path.resolve(__dirname, './src/rp'),
+      '@narrative': path.resolve(__dirname, './src/narrative'),
       '@game': path.resolve(__dirname, './src/game'),
       '@server': path.resolve(__dirname, './src/server'),
     },
   },
   server: {
-    port: 3000,
+    // 3001 is the preview port this project is reviewed on; strictPort makes a
+    // collision fail loudly instead of silently drifting to 3002 and breaking
+    // the preview URL.
+    port: 3001,
+    strictPort: true,
     host: '0.0.0.0',
     allowedHosts: true,
     proxy: {
@@ -27,5 +32,16 @@ export default defineConfig({
   build: {
     target: 'esnext',
     sourcemap: true,
+    // Phase 1.5 (F8): the single 1.07 MB chunk delayed first paint because the
+    // title art waited behind three.js. Three vendors are split so the HUD shell
+    // paints while the 3D bundle streams in.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ['three', '@react-three/fiber'],
+          react: ['react', 'react-dom', 'zustand'],
+        },
+      },
+    },
   },
 })

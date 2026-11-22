@@ -10,6 +10,8 @@ export const playerRef = {
   yaw: Math.PI,
   moving: false,
   sprinting: false,
+  /** vertical offset from the walk cycle (metres), written every frame */
+  bob: 0,
 }
 
 export const cameraRef = {

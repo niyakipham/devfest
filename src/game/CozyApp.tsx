@@ -1,5 +1,4 @@
-import { useEffect } from 'react'
-import { Scene } from './scene/Scene'
+import { lazy, Suspense, useEffect, useMemo } from 'react'
 import { useGameStore } from './store'
 import { TitleScreen } from './ui/TitleScreen'
 import { Creator } from './ui/Creator'
@@ -8,7 +7,14 @@ import { DialogueBox } from './ui/DialogueBox'
 import { Journal } from './ui/Journal'
 import { MapScreen } from './ui/MapScreen'
 import { PauseOverlay, Toasts } from './ui/Overlays'
+import { ErrorBoundary, WebGLFallback, detectWebGL } from './ui/Boundary'
+import { audioBus } from './audio/bus'
+import { PhoShift } from './ui/PhoShift'
 import './ui/styles.css'
+
+// F8: three.js is 800 kB of the bundle. Lazy-loading the scene lets the title
+// screen and HUD paint before the 3D chunk finishes streaming.
+const Scene = lazy(() => import('./scene/Scene').then((m) => ({ default: m.Scene })))
 
 /**
  * One second of real time = one in-game minute (a full day every 24 minutes).
@@ -18,6 +24,22 @@ const TICK_MS = 1000
 const AUTOSAVE_MS = 180_000
 
 export const CozyApp = () => {
+  // Browsers block AudioContext until a gesture. One listener, removed after it fires,
+  // so a muted or sound-less device pays nothing and the graph is never leaked.
+  useEffect(() => {
+    const unlock = (): void => {
+      if (audioBus.init()) void audioBus.resume()
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+    window.addEventListener('pointerdown', unlock, { once: true })
+    window.addEventListener('keydown', unlock, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
+
   const phase = useGameStore((s) => s.phase)
   const dialogue = useGameStore((s) => s.dialogue)
   const journalOpen = useGameStore((s) => s.journalOpen)
@@ -66,10 +88,22 @@ export const CozyApp = () => {
     return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [])
 
+  // F8: check for WebGL before mounting the canvas — a missing context used to
+  // produce a white page with no explanation.
+  const webglError = useMemo(() => detectWebGL(), [])
+
   return (
     <div className="app">
       <div className="scene-layer">
-        <Scene />
+        {webglError ? (
+          <WebGLFallback reason={webglError} />
+        ) : (
+          <ErrorBoundary label="scene">
+            <Suspense fallback={<div className="scene-loading" aria-live="polite">Đang dựng phố cổ…</div>}>
+              <Scene />
+            </Suspense>
+          </ErrorBoundary>
+        )}
       </div>
       <div className="vignette" />
 
@@ -77,6 +111,7 @@ export const CozyApp = () => {
       {phase === 'CREATOR' && <Creator />}
       {(phase === 'PLAYING' || phase === 'PAUSED') && <Hud />}
       {phase === 'PLAYING' && dialogue && <DialogueBox />}
+      {phase === 'PLAYING' && <PhoShift />}
       {phase === 'PLAYING' && journalOpen && <Journal />}
       {phase === 'PLAYING' && mapOpen && <MapScreen />}
       {phase === 'PAUSED' && <PauseOverlay />}

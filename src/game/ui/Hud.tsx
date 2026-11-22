@@ -3,6 +3,7 @@ import { useGameStore } from '../store'
 import { formatClock } from '../scene/atmosphere'
 import { QUESTS } from '../content/quests'
 import { BookIcon, CameraIcon, GearIcon, HelpIcon, MapIcon } from './icons'
+import { SettingsPanel } from './SettingsPanel'
 
 const TOOLS = [
   { id: 'food', icon: '🍜', label: 'Bánh mì dọc đường' },
@@ -31,7 +32,7 @@ const NeedsRow = ({
   icon: string
   label: string
   value: number
-  kind: 'energy' | 'hunger' | 'mood'
+  kind: 'energy' | 'hunger' | 'mood' | 'hygiene'
 }) => (
   <div className="need">
     <span className="need__icon" aria-hidden="true">
@@ -60,6 +61,7 @@ export const Hud = () => {
   const quickEat = useGameStore((s) => s.quickEat)
   const addToast = useGameStore((s) => s.addToast)
   const [activeTool, setActiveTool] = useState(0)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [debug, setDebug] = useState(false)
 
   useEffect(() => {
@@ -134,7 +136,7 @@ export const Hud = () => {
           className="rail__btn"
           title="Cài đặt"
           aria-label="Cài đặt"
-          onClick={() => addToast({ title: 'Cài đặt', message: 'Đồ hoạ, âm thanh, phím tắt — Phase 2.', tone: 'info' })}
+          onClick={() => setSettingsOpen(true)}
         >
           <GearIcon />
         </button>
@@ -159,7 +161,12 @@ export const Hud = () => {
         <NeedsRow icon="⚡" label="Sức" value={player.needs.energy} kind="energy" />
         <NeedsRow icon="🍚" label="Bụng" value={player.needs.hunger} kind="hunger" />
         <NeedsRow icon="🌤" label="Lòng" value={player.needs.mood} kind="mood" />
+        {/* RP-03: hygiene used to decay with no meter and no way to restore it.
+            It is now visible and refillable at the hồ tắm / giếng POIs. */}
+        <NeedsRow icon="💧" label="Sạch" value={player.needs.hygiene} kind="hygiene" />
       </div>
+
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
 
       <div className="switch">
         <div className="switch__row">

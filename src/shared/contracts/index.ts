@@ -59,10 +59,36 @@ export const QuestProgress = z.object({
 })
 export type QuestProgress = z.infer<typeof QuestProgress>
 
-export const SAVE_VERSION = 1
+/**
+ * Journal v2 (RP-08). Entries are capped at 60 by `@rp/journal`, so a full diary is
+ * ~9 kB of JSON — small enough to live beside the save in localStorage and in the
+ * `SaveSlot.payload` JSON column.
+ */
+export const JournalEntrySchema = z.object({
+  id: z.string(),
+  day: z.number().int().min(1),
+  minute: z.number().min(0).max(1439),
+  kind: z.enum(['walk', 'eat', 'craft', 'meet', 'photo', 'earn', 'day']),
+  text: z.string().max(160),
+})
+export type JournalEntrySchema = z.infer<typeof JournalEntrySchema>
 
+export const JournalStatsSchema = z.object({
+  metresWalked: z.number().min(0).default(0),
+  bowlsEaten: z.number().int().min(0).default(0),
+  bowlsBrewed: z.number().int().min(0).default(0),
+  npcsMet: z.number().int().min(0).default(0),
+  photosTaken: z.number().int().min(0).default(0),
+  dongEarned: z.number().int().min(0).default(0),
+  tilesSeen: z.array(z.string()).max(400).default([]),
+})
+export type JournalStatsSchema = z.infer<typeof JournalStatsSchema>
+
+export const SAVE_VERSION = 2
+
+/** Legacy shape, kept only so the v1→v2 migration can be tested against it. */
 export const SaveGameV1 = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   slot: z.number().int().min(0).max(2),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -84,8 +110,54 @@ export const SaveGameV1 = z.object({
       language: z.enum(['vi', 'en']).default('vi'),
     })
     .default({ reduceMotion: false, sfx: true, language: 'vi' }),
+  /** RP-08: self-written diary + lifetime stats. Both optional so v1 saves migrate. */
+  journal: z.array(JournalEntrySchema).max(60).default([]),
+  stats: JournalStatsSchema.default({
+    metresWalked: 0,
+    bowlsEaten: 0,
+    bowlsBrewed: 0,
+    npcsMet: 0,
+    photosTaken: 0,
+    dongEarned: 0,
+    tilesSeen: [],
+  }),
+  metNpcs: z.array(z.string()).max(120).default([]),
 })
 export type SaveGameV1 = z.infer<typeof SaveGameV1>
+
+/**
+ * ER-RP-01: every schema change ships with a migration, not a wipe. A v1 save has
+ * no journal/stats/metNpcs, so it is upgraded in place; a v2 save passes through.
+ * Unknown versions are rejected (readSave returns null and the title screen offers
+ * "new game" instead of crashing).
+ */
+export const migrateSave = (raw: unknown): SaveGameV1 | null => {
+  if (typeof raw !== 'object' || raw === null) return null
+  const version = (raw as { version?: unknown }).version
+
+  if (version === 1) {
+    const upgraded = {
+      ...(raw as Record<string, unknown>),
+      version: 2,
+      journal: [],
+      stats: {
+        metresWalked: 0,
+        bowlsEaten: 0,
+        bowlsBrewed: 0,
+        npcsMet: 0,
+        photosTaken: 0,
+        dongEarned: 0,
+        tilesSeen: [],
+      },
+      metNpcs: [],
+    }
+    const parsed = SaveGameV1.safeParse(upgraded)
+    return parsed.success ? parsed.data : null
+  }
+
+  const parsed = SaveGameV1.safeParse(raw)
+  return parsed.success ? parsed.data : null
+}
 
 export const AuthRegister = z.object({
   email: z.string().email(),

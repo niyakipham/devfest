@@ -115,10 +115,11 @@ describe('http api', () => {
     const token = register.body.token as string
     const authHeader = { authorization: `Bearer ${token}` }
 
+    // malformed: no player block at all
     const bad = await json('/api/save', {
       method: 'POST',
       headers: authHeader,
-      body: JSON.stringify({ slot: 0, save: { version: 1 } }),
+      body: JSON.stringify({ slot: 0, save: { version: 2 } }),
     })
     expect(bad.status).toBe(400)
 
@@ -128,7 +129,7 @@ describe('http api', () => {
       body: JSON.stringify({
         slot: 0,
         save: {
-          version: 1,
+          version: 2,
           slot: 0,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -148,6 +149,9 @@ describe('http api', () => {
           pieces: [],
           clock: { minutes: 400, day: 2, season: 'THU' },
           settings: { reduceMotion: false, sfx: true, language: 'vi' },
+          journal: [],
+          stats: { metresWalked: 0, bowlsEaten: 0, bowlsBrewed: 0, npcsMet: 0, photosTaken: 0, dongEarned: 0, tilesSeen: [] },
+          metNpcs: [],
         },
       }),
     })
