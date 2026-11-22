@@ -5,10 +5,25 @@
 import { create } from 'zustand'
 import type { Needs, Persona, PlayerSnapshot, QuestProgress, SaveGameV1 } from '@shared/contracts'
 import { addCraftXp, decayNeeds, FOOD, applyIncomeCap, dailyIncomeCap } from '@shared/formulas'
+import { PHO_STAGES, brewBowl, bowlsPerDay, ingredientCost, minutesPerBowl, type BrewResult, type Garnish } from '@rp/craft/pho'
 import { POIS, SPAWN, nearestPoi } from '@world/data/hoanKiem'
 import type { Poi } from '@world/types'
 import { QUESTS, questByKey } from './content/quests'
 import { DIALOGUES } from './content/dialogue'
+import {
+  EMPTY_STATS,
+  appendEntry,
+  brewEntry,
+  dayEntry,
+  earnEntry,
+  eatEntry,
+  makeEntryId,
+  meetEntry,
+  photoEntry,
+  walkEntry,
+  type JournalEntry,
+  type JournalStats,
+} from '@rp/journal'
 import { readSave, writeSave } from './save'
 import { playerRef, resetPlayerRef } from './world-ref'
 
@@ -34,6 +49,25 @@ export interface ClockState {
   day: number
   season: 'XUAN' | 'HA' | 'THU' | 'DONG'
 }
+
+/**
+ * A bowl in progress. The mini-game is driven by the scene, but its *state* lives
+ * here so it survives a render and can be asserted in tests.
+ */
+export interface PhoShift {
+  /** how many bowls brewed today */
+  brewed: number
+  /** index into PHO_STAGES, -1 when idle */
+  stage: number
+  /** stop offsets collected so far, ms */
+  offsets: number[]
+  garnish: Garnish[]
+  /** last completed bowl, for the verdict card */
+  last: BrewResult | null
+  open: boolean
+}
+
+export const EMPTY_SHIFT: PhoShift = { brewed: 0, stage: -1, offsets: [], garnish: [], last: null, open: false }
 
 export interface DialogueState {
   key: string
@@ -75,6 +109,11 @@ export interface GameStore {
   earnedToday: number
   hasSave: boolean
   settings: Settings
+  shift: PhoShift
+  /** RP-08: self-written diary, newest first, capped at 60 by @rp/journal */
+  journal: JournalEntry[]
+  stats: JournalStats
+  metNpcs: string[]
 
   setPhase: (phase: Phase) => void
   startNew: (name: string, persona: Persona) => void
@@ -93,6 +132,15 @@ export interface GameStore {
   updateSettings: (patch: Partial<Settings>) => void
   quickEat: () => void
   photoAttempt: () => void
+
+  logWalk: (metres: number, tile: string, atLandmark?: string) => void
+  logEat: (dish: string, price: number) => void
+  logMeet: (name: string, district: string) => void
+  openShift: () => void
+  stopStage: (offsetMs: number) => void
+  placeGarnish: (item: Garnish) => void
+  closeShiftWith: (garnish: Garnish[]) => void
+  closeShift: () => void
 
   syncTransform: () => void
   setStreamStats: (tile: string, loadedTiles: number) => void
@@ -136,6 +184,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   earnedToday: 0,
   hasSave: NO_SAVE !== null,
   settings: NO_SAVE?.settings ?? DEFAULT_SETTINGS,
+  shift: EMPTY_SHIFT,
+  journal: NO_SAVE?.journal ?? [],
+  stats: NO_SAVE?.stats ?? EMPTY_STATS,
+  metNpcs: NO_SAVE?.metNpcs ?? [],
 
   setPhase: (phase) => set({ phase }),
 
@@ -177,6 +229,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       quests: Object.keys(quests).length > 0 ? quests : initialQuests(),
       pieces: save.pieces,
       settings: save.settings,
+      journal: save.journal,
+      stats: save.stats,
+      metNpcs: save.metNpcs,
       dialogue: null,
       toasts: [],
     })
@@ -187,9 +242,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   resume: () => set({ phase: 'PLAYING' }),
 
   saveNow: () => {
-    const { player, clock, quests, pieces } = get()
+    const { player, clock, quests, pieces, journal, stats, metNpcs } = get()
     const save: SaveGameV1 = {
-      version: 1,
+      version: 2,
       slot: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -198,6 +253,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       pieces,
       clock,
       settings: get().settings,
+      journal,
+      stats,
+      metNpcs,
     }
     try {
       writeSave(save)
@@ -227,6 +285,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       earnedToday: rolled ? 0 : get().earnedToday,
     })
     if (rolled) {
+      set({ journal: appendEntry(get().journal, dayEntry(day, makeEntryId)) })
       get().addToast({
         title: `Ngày ${day} bắt đầu`,
         message: 'Một ngày mới ở Hà Nội. Thu nhập hôm nay được tính lại từ đầu.',
@@ -261,6 +320,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const key = poi.action.slice('dialogue:'.length)
       if (DIALOGUES[key]) {
         set({ dialogue: { key, poiId: poi.id } })
+        get().logMeet(poi.name, poi.district)
         return
       }
     }
@@ -283,6 +343,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           },
         },
       })
+      get().logEat(poi.name, price)
       get().addToast({ title: `Đã mua ${poi.name}`, message: `−${price}đ · ăn ngon miệng`, tone: 'info' })
       if (quests['q-pho']?.state === 'ACTIVE') completeQuest(set, get, 'q-pho')
       return
@@ -307,11 +368,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     if (poi.type === 'PHOTO_SPOT') {
       const active = get().quests['q-photo']?.state === 'ACTIVE'
+      const { stats, journal, clock } = get()
+      const shot = photoEntry(stats, { subject: poi.name, day: clock.day, minute: clock.minutes }, makeEntryId)
+      set({ stats: shot.stats, journal: appendEntry(journal, shot.entry) })
       if (active) {
         completeQuest(set, get, 'q-photo')
       } else {
         get().addToast({ title: `Bạn ngắm ${poi.name} một lúc`, message: 'Mặt hồ phẳng như tấm gương.', tone: 'info' })
       }
+      return
+    }
+
+    // RP-03: hygiene decays, so it must also be restorable. A public tap / well is
+    // the realistic Hanoi answer and costs a few minutes instead of money.
+    if (poi.action === 'wash' ) {
+      const { player } = get()
+      if (player.needs.hygiene >= 98) {
+        get().addToast({ title: 'Đang sạch sẽ', message: 'Rửa mặt lúc này cũng chẳng thêm gì.', tone: 'info' })
+        return
+      }
+      set({
+        player: {
+          ...player,
+          needs: { ...player.needs, hygiene: Math.min(100, player.needs.hygiene + 45), mood: Math.min(100, player.needs.mood + 3) },
+        },
+      })
+      get().tick(8)
+      get().addToast({ title: poi.name, message: 'Nước mát. Bạn rửa mặt và thấy tỉnh hẳn.', tone: 'info' })
       return
     }
 
@@ -403,6 +486,146 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   updateSettings: (patch) => set({ settings: { ...get().settings, ...patch } }),
 
+  /* ------------------------------ JOURNAL (RP-08) ------------------------------ */
+  // Every log action reads the current clock, appends, and merges the derived stat.
+  // The diary can never disagree with the numbers because both come from one call.
+
+  logWalk: (metres, tile, atLandmark) => {
+    const { journal, stats, clock } = get()
+    const result = walkEntry(stats, { metres, tile, atLandmark, day: clock.day, minute: clock.minutes }, makeEntryId)
+    set({ stats: result.stats, journal: result.entry ? appendEntry(journal, result.entry) : journal })
+  },
+
+  logEat: (dish, price) => {
+    const { journal, stats, clock } = get()
+    const result = eatEntry(stats, { dish, price, day: clock.day, minute: clock.minutes }, makeEntryId)
+    set({ stats: result.stats, journal: appendEntry(journal, result.entry) })
+  },
+
+  logMeet: (name, district) => {
+    const { journal, stats, metNpcs, clock } = get()
+    const result = meetEntry(stats, metNpcs, { name, district, day: clock.day, minute: clock.minutes }, makeEntryId)
+    set({
+      stats: result.stats,
+      metNpcs: result.metNpcs,
+      journal: result.entry ? appendEntry(journal, result.entry) : journal,
+    })
+  },
+
+  /* --------------------------- NGHỀ PHỞ (RP-04) --------------------------- */
+  // A shift is the repeatable profession that finally makes the XP curve reachable
+  // (the Phase 1 audit: 105 XP of content vs 120 XP needed for L1→L2).
+
+  openShift: () => {
+    const { player, shift } = get()
+    if (shift.brewed >= bowlsPerDay(player.craftLevel)) {
+      get().addToast({
+        title: 'Hết nguyên liệu hôm nay',
+        message: `Quán đã bán ${shift.brewed} bát. Mai cô Hoa lại dọn hàng.`,
+        tone: 'info',
+      })
+      return
+    }
+    if (player.dong < ingredientCost()) {
+      get().addToast({ title: 'Không đủ tiền mua nguyên liệu', message: `Cần ${ingredientCost()}đ cho một bát.`, tone: 'info' })
+      return
+    }
+    set({
+      shift: { ...EMPTY_SHIFT, brewed: shift.brewed, stage: 0, offsets: [], garnish: [], last: shift.last, open: true },
+    })
+  },
+
+  stopStage: (offsetMs) => {
+    const { shift, player } = get()
+    if (!shift.open || shift.stage < 0 || shift.stage >= PHO_STAGES.length) return
+    const offsets = [...shift.offsets, offsetMs]
+    const nextStage = shift.stage + 1
+    if (nextStage < PHO_STAGES.length) {
+      set({ shift: { ...shift, offsets, stage: nextStage } })
+      return
+    }
+    // all three stages timed: the bowl is only graded once garnish is placed
+    set({ shift: { ...shift, offsets, stage: -1 } })
+    void player
+  },
+
+  placeGarnish: (item) => {
+    const { shift } = get()
+    if (!shift.open || shift.offsets.length !== PHO_STAGES.length) return
+    const garnish = [...shift.garnish, item]
+    if (garnish.length < 3) {
+      set({ shift: { ...shift, garnish } })
+      return
+    }
+    get().closeShiftWith(garnish)
+  },
+
+  /**
+   * Grades the finished bowl, pays it out through the same income cap as quests,
+   * and advances the shift. Money and XP only move here — never in the UI.
+   */
+  closeShiftWith: (garnish) => {
+    const { shift, player } = get()
+    if (shift.offsets.length !== PHO_STAGES.length) return
+
+    const result = brewBowl({
+      craftLevel: player.craftLevel,
+      offsets: [shift.offsets[0] ?? 9_999, shift.offsets[1] ?? 9_999, shift.offsets[2] ?? 9_999],
+      garnish,
+    })
+
+    const cost = ingredientCost()
+    const gross = applyIncomeCap(result.payout, get().earnedToday, dailyIncomeCap(player.craftLevel))
+    const net = gross - cost
+    const xp = addCraftXp(player.craftLevel, player.craftXp, result.xp)
+
+    set({
+      player: {
+        ...player,
+        dong: player.dong + net,
+        craftLevel: xp.level,
+        craftXp: xp.xp,
+        needs: { ...player.needs, energy: Math.max(0, player.needs.energy - 4) },
+      },
+      shift: { ...EMPTY_SHIFT, brewed: shift.brewed + 1, last: result, open: true },
+      earnedToday: get().earnedToday + Math.max(0, gross),
+      clock: (() => {
+        let total = get().clock.minutes + minutesPerBowl
+        let day = get().clock.day
+        while (total >= 1440) {
+          total -= 1440
+          day += 1
+        }
+        return { ...get().clock, minutes: total, day }
+      })(),
+    })
+
+    const logged = brewEntry(get().stats, {
+      verdict: result.verdict,
+      quality: result.quality,
+      dong: net,
+      day: get().clock.day,
+      minute: get().clock.minutes,
+    }, makeEntryId)
+    set({ stats: logged.stats, journal: appendEntry(get().journal, logged.entry) })
+
+    get().addToast({
+      title: result.perfect ? 'Bát phở hoàn hảo!' : 'Xong một bát',
+      message: `${result.verdict} ${net >= 0 ? `+${net}đ` : `${net}đ`} · +${result.xp} XP`,
+      tone: 'reward',
+    })
+
+    if (xp.leveledUp) {
+      get().addToast({
+        title: `Tay nghề lên ${xp.level}`,
+        message: 'Cô Hoa gật đầu: “Được đấy, mai bán thêm bát nữa.”',
+        tone: 'reward',
+      })
+    }
+  },
+
+  closeShift: () => set({ shift: { ...EMPTY_SHIFT, brewed: get().shift.brewed, last: get().shift.last } }),
+
   quickEat: () => {
     const { player } = get()
     const snack = FOOD.banhMi
@@ -490,6 +713,16 @@ const completeQuest = (
       : get().pieces,
     earnedToday: get().earnedToday + cappedDong,
   })
+
+  if (cappedDong > 0) {
+    const earned = earnEntry(get().stats, {
+      reason: `Xong việc: ${def.title}`,
+      dong: cappedDong,
+      day: get().clock.day,
+      minute: get().clock.minutes,
+    }, makeEntryId)
+    set({ stats: earned.stats, journal: appendEntry(get().journal, earned.entry) })
+  }
 
   get().addToast({
     title: `Hoàn thành: ${def.title}`,

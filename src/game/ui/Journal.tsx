@@ -1,6 +1,17 @@
 import { useGameStore } from '../store'
 import { QUESTS } from '../content/quests'
 import { dayLabel, formatClock } from '../scene/atmosphere'
+import { formatEntryTime, formatKm, type JournalKind } from '@rp/journal'
+
+const KIND_ICON: Record<JournalKind, string> = {
+  walk: '👣',
+  eat: '🍜',
+  craft: '🔥',
+  meet: '🙋',
+  photo: '📷',
+  earn: '🪙',
+  day: '🌅',
+}
 
 const STATE_LABEL: Record<string, string> = {
   LOCKED: 'Chưa mở',
@@ -17,6 +28,8 @@ export const Journal = () => {
   const clock = useGameStore((s) => s.clock)
   const pieces = useGameStore((s) => s.pieces)
   const tile = useGameStore((s) => s.tile)
+  const journal = useGameStore((s) => s.journal)
+  const stats = useGameStore((s) => s.stats)
 
   return (
     <div className="journal">
@@ -57,6 +70,28 @@ export const Journal = () => {
             {Object.keys(quests).length === 0 && <p className="journal__empty">Chưa có việc gì. Ra phố thử xem.</p>}
           </section>
 
+          <section>
+            <h3>Nhật ký</h3>
+            {/* RP-08: self-written from events, newest first, capped at 60 */}
+            {journal.length === 0 ? (
+              <p className="journal__empty">Chưa có gì để kể. Đi bộ một vòng hồ rồi mở lại.</p>
+            ) : (
+              <ol className="journal__feed">
+                {journal.map((entry) => (
+                  <li key={entry.id} className={`journal__entry journal__entry--${entry.kind}`}>
+                    <span className="journal__kind" aria-hidden="true">
+                      {KIND_ICON[entry.kind]}
+                    </span>
+                    <div>
+                      <p className="journal__text">{entry.text}</p>
+                      <time className="journal__time">{formatEntryTime(entry)}</time>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+
           <aside>
             <h3>Hành trang</h3>
             <dl className="journal__stats">
@@ -73,6 +108,22 @@ export const Journal = () => {
               <div>
                 <dt>Mảnh ký ức</dt>
                 <dd>{pieces.length} / 480</dd>
+              </div>
+              <div>
+                <dt>Đã đi</dt>
+                <dd>{formatKm(stats.metresWalked)}</dd>
+              </div>
+              <div>
+                <dt>Bát phở</dt>
+                <dd>
+                  ăn {stats.bowlsEaten} · nấu {stats.bowlsBrewed}
+                </dd>
+              </div>
+              <div>
+                <dt>Gặp gỡ</dt>
+                <dd>
+                  {stats.npcsMet} người · {stats.photosTaken} tấm ảnh
+                </dd>
               </div>
               <div>
                 <dt>Danh tiếng</dt>

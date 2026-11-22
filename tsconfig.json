@@ -27,6 +27,7 @@
       "@shared/*": ["src/shared/*"],
       "@world/*": ["src/world/*"],
       "@rp/*": ["src/rp/*"],
+      "@narrative/*": ["src/narrative/*"],
       "@game/*": ["src/game/*"],
       "@server/*": ["src/server/*"]
     }

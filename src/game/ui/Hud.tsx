@@ -31,7 +31,7 @@ const NeedsRow = ({
   icon: string
   label: string
   value: number
-  kind: 'energy' | 'hunger' | 'mood'
+  kind: 'energy' | 'hunger' | 'mood' | 'hygiene'
 }) => (
   <div className="need">
     <span className="need__icon" aria-hidden="true">
@@ -159,6 +159,9 @@ export const Hud = () => {
         <NeedsRow icon="⚡" label="Sức" value={player.needs.energy} kind="energy" />
         <NeedsRow icon="🍚" label="Bụng" value={player.needs.hunger} kind="hunger" />
         <NeedsRow icon="🌤" label="Lòng" value={player.needs.mood} kind="mood" />
+        {/* RP-03: hygiene used to decay with no meter and no way to restore it.
+            It is now visible and refillable at the hồ tắm / giếng POIs. */}
+        <NeedsRow icon="💧" label="Sạch" value={player.needs.hygiene} kind="hygiene" />
       </div>
 
       <div className="switch">

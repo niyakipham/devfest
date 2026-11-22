@@ -76,6 +76,7 @@
   --c-meter-energy: #ffe07a;
   --c-meter-hunger: #b6ee6d;
   --c-meter-mood: #7fe3f5;
+  --c-meter-hygiene: #c9e8ff;
 
 
   /* ---------- elevation ---------- */
@@ -592,6 +593,10 @@ body,
   height: 100%;
   border-radius: 999px;
   transition: width 320ms var(--e-out);
+}
+
+.need__fill--hygiene {
+  background: var(--c-meter-hygiene);
 }
 
 .need__fill--energy {
@@ -1352,6 +1357,210 @@ input:focus-visible,
   .btn {
     min-height: calc(var(--tap-min) + 4px);
   }
+}
+
+
+
+/* ------------------------------- diary feed ------------------------------- */
+.journal__feed {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.journal__entry {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 8px 10px;
+  border-radius: var(--r-slab);
+  background: var(--c-sunken);
+}
+
+.journal__entry--earn,
+.journal__entry--craft {
+  background: var(--c-gold-wash);
+}
+
+.journal__entry--day {
+  background: var(--c-primary-wash);
+}
+
+.journal__kind {
+  font-size: var(--t-body);
+  line-height: 1.3;
+}
+
+.journal__text {
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--c-ink);
+}
+
+.journal__time {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--t-caption);
+  font-weight: 800;
+  color: var(--c-ink-muted);
+}
+
+/* =============================== NGHỀ PHỞ =============================== */
+/* RP-04: one card, one primary button, a visible timing window. Sits bottom-centre
+   above the prompt capsule so it never covers the party wheel or the needs meters. */
+
+.shift__launcher {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sp-hud-b) + 86px);
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  z-index: 6;
+}
+
+.shift__launcher .btn {
+  width: auto;
+  padding: 12px 22px;
+}
+
+.shift__launcher .btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.shift__card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, 92vw);
+  display: grid;
+  gap: 12px;
+  z-index: 8;
+}
+
+.shift__title {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--t-h2);
+  font-weight: 900;
+  color: var(--c-ink);
+}
+
+.shift__step {
+  font-size: var(--t-caption);
+  font-weight: 800;
+  color: var(--c-ink-muted);
+}
+
+.shift__hint,
+.shift__verdict {
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--c-ink-soft);
+}
+
+.shift__meta {
+  margin: 0;
+  font-size: var(--t-caption);
+  font-weight: 800;
+  color: var(--c-ink-muted);
+}
+
+/* the timing track: green graze zone, gold perfect zone, dark needle */
+.shift__track {
+  position: relative;
+  height: 22px;
+  border-radius: var(--r-pill);
+  background: var(--c-sunken);
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px var(--c-line-soft);
+}
+
+.shift__zone {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+}
+
+.shift__zone--good {
+  background: var(--c-primary-wash-2);
+}
+
+.shift__zone--perfect {
+  background: var(--c-gold-wash);
+}
+
+.shift__needle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: var(--r-pill);
+  background: var(--c-ink);
+}
+
+.shift__scores {
+  display: grid;
+  gap: 8px;
+}
+
+.shift__score {
+  display: grid;
+  grid-template-columns: 96px 1fr 42px;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--t-caption);
+  font-weight: 800;
+  color: var(--c-ink-soft);
+}
+
+.shift__score b {
+  text-align: right;
+  color: var(--c-ink);
+}
+
+.shift__bar {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--c-sunken);
+  overflow: hidden;
+}
+
+.shift__bar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--c-primary);
+}
+
+.shift__garnish {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.shift__garnish .btn {
+  width: 100%;
+  padding: 10px 6px;
+  font-size: var(--t-caption);
 }
 
 /* ============================ RESPONSIVE ============================== */

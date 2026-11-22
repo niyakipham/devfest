@@ -287,7 +287,7 @@ model Npc / QuestDef / QuestInstance / Reputation / WardrobeItem / Housing / Pho
 | Phase | Nội dung | LoC ra | Checkpoint |
 |---|---|---|---|
 | 1 | Core loop + Hoàn Kiếm + nhân vật + save | 9.000 | Vào game < 8 s, 60 FPS — **đã đạt 6.111** |
-| **1.5** | **Trả nợ (bắt buộc trước Phase 2): xoá legacy khỏi `main`, xoá 2 hệ token chết, dựng ESLint + CI, ErrorBoundary, sửa schema Prisma, sửa giá server-side, reset income cap** | **−1.500 (xoá) +800** | Mọi cổng **đỏ được**; 0 hex viết cứng |
+| **1.5** | ~~Trả nợ~~ **XONG 2026-11-21** — xem `docs/adr/ADR-004-phase-1-5-debt-gates.md`: xoá legacy, xoá 2 hệ token chết, 7 cổng CI, ErrorBoundary + WebGL fallback, schema Prisma viết lại, giá server-side, reset income cap, contrast AA, focus ring, safe-area, bundle tách tầng | **−1.500 (xoá) +2.100** | ✅ 7/7 cổng xanh; 0 hex ngoài palette; 84 test; shell 104 kB |
 | 2 | POI/shop/dialogue + nghề phở + needs + journal + audio | 9.000 | Chơi 30 phút có mục tiêu |
 | 3 | Quest graph + 15 quest + 30 NPC + reputation | 8.000 | Xong 1 chain main |
 | 4 | Economy + ledger + shop + save cloud + auth + IAP | 8.000 | Mua bán không thể duplicate |

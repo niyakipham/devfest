@@ -1,9 +1,11 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 import { clearSave, hasSave, readSave, writeSave } from '@game/save'
+import { migrateSave } from '@shared/contracts'
 import type { SaveGameV1 } from '@shared/contracts'
 
 const makeSave = (name = 'Minh'): SaveGameV1 => ({
-  version: 1,
+  version: 2,
   slot: 0,
   createdAt: '2026-11-21T05:00:00.000Z',
   updatedAt: '2026-11-21T05:10:00.000Z',
@@ -23,6 +25,9 @@ const makeSave = (name = 'Minh'): SaveGameV1 => ({
   pieces: ['piece-01'],
   clock: { minutes: 340, day: 1, season: 'DONG' },
   settings: { reduceMotion: false, sfx: true, language: 'vi' },
+  journal: [],
+  stats: { metresWalked: 0, bowlsEaten: 0, bowlsBrewed: 0, npcsMet: 0, photosTaken: 0, dongEarned: 0, tilesSeen: [] },
+  metNpcs: [],
 })
 
 describe('save system', () => {
@@ -64,5 +69,60 @@ describe('save system', () => {
     writeSave(makeSave())
     clearSave()
     expect(hasSave()).toBe(false)
+  })
+})
+
+/**
+ * ER-RP-01: the journal (v2) must not wipe a Phase 1 save. A v1 payload has no
+ * journal/stats/metNpcs — the migration fills them in and keeps every other value.
+ */
+describe('save migration v1 → v2', () => {
+  beforeEach(() => clearSave())
+
+  it('upgrades a v1 payload in place instead of rejecting it', () => {
+    const v2 = makeSave()
+    const { journal: _j, stats: _s, metNpcs: _m, ...rest } = v2
+    const v1 = { ...rest, version: 1 }
+
+    const migrated = migrateSave(v1)
+    expect(migrated).not.toBeNull()
+    expect(migrated!.version).toBe(2)
+    expect(migrated!.player.name).toBe('Minh')
+    expect(migrated!.pieces).toEqual(['piece-01'])
+    expect(migrated!.journal).toEqual([])
+    expect(migrated!.metNpcs).toEqual([])
+    expect(migrated!.stats.metresWalked).toBe(0)
+  })
+
+  it('reads a v1 payload that is still sitting in the old storage key', () => {
+    const v2 = makeSave()
+    const { journal: _j, stats: _s, metNpcs: _m, ...rest } = v2
+    const v1 = { ...rest, version: 1 }
+    const store = (globalThis as { localStorage?: Storage }).localStorage
+    expect(store, 'this test needs a real Storage (jsdom environment)').toBeDefined()
+    store!.setItem('hanoi-legends:save:v1', JSON.stringify(v1))
+
+    const loaded = readSave()
+    expect(loaded?.version).toBe(2)
+    expect(loaded?.player.name).toBe('Minh')
+  })
+
+  it('rejects a payload that is not an object at all', () => {
+    expect(migrateSave(null)).toBeNull()
+    expect(migrateSave('nope')).toBeNull()
+    expect(migrateSave(42)).toBeNull()
+  })
+
+  it('keeps journal entries through a round-trip', () => {
+    const save = makeSave()
+    save.journal = [{ id: 'j-meet-co-hoa', day: 2, minute: 420, kind: 'meet', text: 'Gặp Cô Hoa.' }]
+    save.stats.bowlsBrewed = 7
+    save.metNpcs = ['Cô Hoa']
+
+    writeSave(save)
+    const loaded = readSave()
+    expect(loaded?.journal[0].text).toBe('Gặp Cô Hoa.')
+    expect(loaded?.stats.bowlsBrewed).toBe(7)
+    expect(loaded?.metNpcs).toEqual(['Cô Hoa'])
   })
 })

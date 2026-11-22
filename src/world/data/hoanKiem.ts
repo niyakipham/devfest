@@ -250,6 +250,8 @@ const fillAmbient = (pois: Poi[]): Poi[] => {
     { type: 'SHRINE', name: 'Miếu nhỏ', nameEn: 'Street shrine', action: 'worship' },
     { type: 'FOOD', name: 'Hàng trà đá vỉa hè', nameEn: 'Iced tea stall', action: 'food' },
     { type: 'BENCH', name: 'Gốc cây bóng mát', nameEn: 'Shady tree', action: 'rest' },
+    // RP-03: hygiene decays, so the world must offer a way to restore it.
+    { type: 'SHOP', name: 'Vòi nước công cộng', nameEn: 'Public tap', action: 'wash' },
   ]
 
   const out = [...pois]

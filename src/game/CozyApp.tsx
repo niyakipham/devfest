@@ -8,6 +8,7 @@ import { Journal } from './ui/Journal'
 import { MapScreen } from './ui/MapScreen'
 import { PauseOverlay, Toasts } from './ui/Overlays'
 import { ErrorBoundary, WebGLFallback, detectWebGL } from './ui/Boundary'
+import { PhoShift } from './ui/PhoShift'
 import './ui/styles.css'
 
 // F8: three.js is 800 kB of the bundle. Lazy-loading the scene lets the title
@@ -93,6 +94,7 @@ export const CozyApp = () => {
       {phase === 'CREATOR' && <Creator />}
       {(phase === 'PLAYING' || phase === 'PAUSED') && <Hud />}
       {phase === 'PLAYING' && dialogue && <DialogueBox />}
+      {phase === 'PLAYING' && <PhoShift />}
       {phase === 'PLAYING' && journalOpen && <Journal />}
       {phase === 'PLAYING' && mapOpen && <MapScreen />}
       {phase === 'PAUSED' && <PauseOverlay />}

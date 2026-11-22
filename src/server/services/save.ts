@@ -1,4 +1,5 @@
-import { SaveGameV1 } from '@shared/contracts'
+import { migrateSave } from '@shared/contracts'
+import type { SaveGameV1 } from '@shared/contracts'
 import type { MemoryStore, SaveRecord } from '../repo/memory'
 
 export class SaveError extends Error {
@@ -16,12 +17,14 @@ export class SaveService {
 
   push(userId: string, slot: number, candidate: unknown): SaveRecord {
     if (!Number.isInteger(slot) || slot < 0 || slot > 2) throw new SaveError('slot must be 0..2', 'SLOT_OUT_OF_RANGE')
-    const parsed = SaveGameV1.safeParse(candidate)
-    if (!parsed.success) throw new SaveError('save payload does not match schema', 'INVALID_SAVE')
+    // ER-RP-01: a client running an older build still pushes v1. Migrating here
+    // means a schema bump never strands a player mid-progress; only genuinely
+    // malformed payloads are rejected.
+    const migrated = migrateSave(candidate)
+    if (!migrated) throw new SaveError('save payload does not match schema', 'INVALID_SAVE')
 
     const save: SaveGameV1 = {
-      ...parsed.data,
-      version: 1,
+      ...migrated,
       slot,
       updatedAt: new Date().toISOString(),
     }

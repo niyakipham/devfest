@@ -28,32 +28,59 @@ module.exports = {
     '@typescript-eslint/consistent-type-imports': ['warn', { prefer: 'type-imports' }],
 
     // ---- architecture: the import arrows must not point backwards ----
+    // Enforced per layer in `overrides` below. The global rule only bans crossing
+    // straight into the server from client code (the server imports the client's
+    // shared code, never the reverse).
     'no-restricted-imports': [
       'error',
       {
         patterns: [
-          {
-            group: ['@game/*', '@server/*', '@rp/*', '@narrative/*'],
-            message: 'shared/world must not import upwards. Arrows: shared ← world ← rp ← narrative ← game/ui',
-          },
-          {
-            group: ['@game/*'],
-            message: 'server may only import @shared. Server is headless.',
-          },
+          { group: ['@server/*'], message: 'client code must never import the server. Use @shared contracts.' },
         ],
       },
     ],
   },
   overrides: [
     {
-      files: ['src/shared/**/*.ts', 'src/world/**/*.ts'],
+      // layer 0 — shared knows nothing above it
+      files: ['src/shared/**/*.ts'],
       rules: {
         'no-restricted-imports': [
           'error',
           {
             patterns: [
-              { group: ['@game/*', '@server/*', '@rp/*', '@narrative/*'], message: 'shared/world must not import upwards.' },
-              { group: ['react', 'react-dom', 'three', '@react-three/*'], message: 'shared/world are engine-free. No React, no three.js.' },
+              { group: ['@world/*', '@rp/*', '@narrative/*', '@game/*', '@server/*'], message: 'shared is the bottom layer: it may not import anything above it.' },
+              { group: ['react', 'react-dom', 'three', '@react-three/*'], message: 'shared is engine-free. No React, no three.js.' },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // layer 1 — world may use shared only
+      files: ['src/world/**/*.ts'],
+      rules: {
+        'no-restricted-imports': [
+          'error',
+          {
+            patterns: [
+              { group: ['@rp/*', '@narrative/*', '@game/*', '@server/*'], message: 'world may only import @shared. Arrows: shared ← world ← rp ← narrative ← game.' },
+              { group: ['react', 'react-dom', 'three', '@react-three/*'], message: 'world is engine-free. No React, no three.js.' },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // layer 2 — roleplay systems may use shared + world
+      files: ['src/rp/**/*.ts'],
+      rules: {
+        'no-restricted-imports': [
+          'error',
+          {
+            patterns: [
+              { group: ['@narrative/*', '@game/*', '@server/*'], message: 'rp may only import @shared and @world.' },
+              { group: ['react', 'react-dom', 'three', '@react-three/*'], message: 'rp is engine-free — it must be server-runnable for anti-cheat.' },
             ],
           },
         ],

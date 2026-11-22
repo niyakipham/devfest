@@ -10,6 +10,7 @@ export default defineConfig({
       '@shared': path.resolve(__dirname, './src/shared'),
       '@world': path.resolve(__dirname, './src/world'),
       '@rp': path.resolve(__dirname, './src/rp'),
+      '@narrative': path.resolve(__dirname, './src/narrative'),
       '@game': path.resolve(__dirname, './src/game'),
       '@server': path.resolve(__dirname, './src/server'),
     },

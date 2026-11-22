@@ -124,3 +124,51 @@ describe('atmosphere', () => {
     expect(atmosphereAt(720).sunIntensity).toBeGreaterThan(atmosphereAt(60).sunIntensity)
   })
 })
+
+/**
+ * RP-03: hygiene used to decay at 0.04/min with no meter and no way to restore it,
+ * so after ~33 in-game hours the stat was permanently at 0 and invisible. The fix is
+ * a meter plus public taps, and it must stay free (a cozy game never gates cleanliness
+ * behind money).
+ */
+describe('hygiene is a real need now', () => {
+  it('has a public tap reachable in every phase-1 tile that needs one', () => {
+    const taps = POIS.filter((p) => p.action === 'wash')
+    expect(taps.length).toBeGreaterThan(10)
+    for (const tap of taps) {
+      expect(tap.type).toBe('SHOP')
+      expect(tap.name).toContain('Vòi nước')
+    }
+  })
+
+  it('restores hygiene at a tap and advances the clock', () => {
+    useGameStore.getState().startNew('Lan', 'PHOTOGRAPHER')
+    const tap = POIS.find((p) => p.action === 'wash')!
+    useGameStore.setState({
+      player: { ...useGameStore.getState().player, needs: { ...useGameStore.getState().player.needs, hygiene: 20 } },
+      promptPoi: tap,
+      clock: { minutes: 600, day: 2, season: 'THU' },
+    })
+
+    const dongBefore = useGameStore.getState().player.dong
+    useGameStore.getState().interact()
+    const after = useGameStore.getState()
+    // +45 then 8 minutes of decay (−0.32): the need layer owns the final number
+    expect(after.player.needs.hygiene).toBeCloseTo(64.68, 2)
+    expect(after.clock.minutes).toBe(608)
+    // washing is free
+    expect(after.player.dong).toBe(dongBefore)
+  })
+
+  it('is capped at 100 and does not loop', () => {
+    useGameStore.getState().startNew('Lan', 'PHOTOGRAPHER')
+    const tap = POIS.find((p) => p.action === 'wash')!
+    useGameStore.setState({
+      player: { ...useGameStore.getState().player, needs: { ...useGameStore.getState().player.needs, hygiene: 90 } },
+      promptPoi: tap,
+    })
+    useGameStore.getState().interact()
+    // capped before decay applies
+    expect(useGameStore.getState().player.needs.hygiene).toBeCloseTo(99.68, 2)
+  })
+})

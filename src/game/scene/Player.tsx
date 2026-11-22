@@ -9,6 +9,9 @@ import { WORLD } from '@world/palette'
 
 const blocked = (x: number, z: number): boolean => !isWalkable(x, z)
 
+/** How often walked distance is committed to the journal (seconds of real time). */
+const WALK_FLUSH_SECONDS = 1
+
 const prefersReducedMotion = (): boolean =>
   typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -41,6 +44,8 @@ export const Player = () => {
   // F9: respect the player setting and the OS preference, not a hard-coded false
   const reduceMotion = useGameStore((s) => s.settings.reduceMotion) || prefersReducedMotion()
   const bobT = useRef(0)
+  /** RP-08 odometer: metres since the last flush, and time since the last flush */
+  const walkedRef = useRef({ distance: 0, carry: 0 })
   const lastScan = useRef(0)
   const dragging = useRef(false)
   const lastPointer = useRef({ x: 0, y: 0 })
@@ -149,6 +154,8 @@ export const Player = () => {
 
       const nx = playerRef.x + dirX * speed * dt
       const nz = playerRef.z + dirZ * speed * dt
+      const fromX = playerRef.x
+      const fromZ = playerRef.z
       if (!blocked(nx, nz)) {
         playerRef.x = nx
         playerRef.z = nz
@@ -158,6 +165,18 @@ export const Player = () => {
         playerRef.z = nz
       }
       bobT.current += dt * (sprint ? 13 : 9)
+
+      // RP-08: distance actually travelled feeds the journal's "km đã đi".
+      // Accumulated in a ref and flushed once per second — logging every frame
+      // would write to the store 60×/s and re-render the HUD for no reason.
+      walkedRef.current.distance += Math.hypot(playerRef.x - fromX, playerRef.z - fromZ)
+      walkedRef.current.carry += dt
+      if (walkedRef.current.carry >= WALK_FLUSH_SECONDS) {
+        walkedRef.current.carry = 0
+        const metres = walkedRef.current.distance
+        walkedRef.current.distance = 0
+        if (metres > 0.5) store.logWalk(metres, store.tile)
+      }
     }
 
     playerRef.moving = isMoving
