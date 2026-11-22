@@ -16,7 +16,11 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    // 3001 is the preview port this project is reviewed on; strictPort makes a
+    // collision fail loudly instead of silently drifting to 3002 and breaking
+    // the preview URL.
+    port: 3001,
+    strictPort: true,
     host: '0.0.0.0',
     allowedHosts: true,
     proxy: {
