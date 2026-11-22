@@ -63,7 +63,7 @@ export const neighbourhood = (tx: number, tz: number, radius = 1): Array<[number
 export const distance2D = (ax: number, az: number, bx: number, bz: number): number =>
   Math.hypot(ax - bx, az - bz)
 
-interface DistrictRect {
+export interface DistrictRect {
   id: string
   name: string
   x0: number
