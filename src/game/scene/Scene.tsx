@@ -11,6 +11,7 @@ import { atmosphereAt } from './atmosphere'
 import { City } from './City'
 import { Lake } from './Lake'
 import { Player } from './Player'
+import { WORLD } from '@world/palette'
 
 const Ground = () => {
   const patches = useMemo(
@@ -21,7 +22,7 @@ const Ground = () => {
           x: LAKE.cx + Math.cos(angle) * (140 + i * 46),
           z: LAKE.cz + Math.sin(angle) * (170 + i * 38),
           s: 70 + ((i * 37) % 90),
-          color: i % 3 === 0 ? '#97DA55' : i % 3 === 1 ? '#6DBB39' : '#84CB46',
+          color: i % 3 === 0 ? WORLD.grassPatchA : i % 3 === 1 ? WORLD.grassPatchB : WORLD.grassPatchC,
         }
       }),
     [],
@@ -31,7 +32,7 @@ const Ground = () => {
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[2500, 0, 2000]} receiveShadow>
         <planeGeometry args={[5200, 4200]} />
-        <meshStandardMaterial color="#7CC63F" roughness={1} />
+        <meshStandardMaterial color={WORLD.grass} roughness={1} />
       </mesh>
       {patches.map((p, i) => (
         <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[p.x, 0.012, p.z]}>
@@ -48,7 +49,7 @@ const Ground = () => {
             scale={[260, 70, 150]}
           >
             <icosahedronGeometry args={[1, 0]} />
-            <meshStandardMaterial color="#519B34" roughness={1} flatShading />
+            <meshStandardMaterial color={WORLD.hillGreen} roughness={1} flatShading />
           </mesh>
         )
       })}
@@ -74,15 +75,15 @@ const QuestMarkers = () => {
         <group key={npc.id} position={[npc.x, 0, npc.z]}>
           <mesh position={[0, 1.02, 0]} castShadow>
             <capsuleGeometry args={[0.31, 0.72, 6, 12]} />
-            <meshStandardMaterial color={i % 2 === 0 ? '#B8735F' : '#6B7F92'} roughness={0.85} />
+            <meshStandardMaterial color={i % 2 === 0 ? WORLD.facadeRose : WORLD.facadeSlate} roughness={0.85} />
           </mesh>
           <mesh position={[0, 1.62, 0]} castShadow>
             <sphereGeometry args={[0.23, 14, 12]} />
-            <meshStandardMaterial color="#E3BE97" roughness={0.8} />
+            <meshStandardMaterial color={WORLD.facadeWarm} roughness={0.8} />
           </mesh>
           <mesh position={[0, 1.85, 0]} castShadow>
             <coneGeometry args={[0.44, 0.2, 16]} />
-            <meshStandardMaterial color="#EADFC0" roughness={0.9} />
+            <meshStandardMaterial color={WORLD.facadeCream} roughness={0.9} />
           </mesh>
           <group
             ref={(el) => {
@@ -92,7 +93,7 @@ const QuestMarkers = () => {
           >
             <mesh rotation={[Math.PI / 2, 0, 0]}>
               <torusGeometry args={[0.26, 0.06, 8, 20]} />
-              <meshStandardMaterial color="#FFF4D6" emissive="#D9A441" emissiveIntensity={0.9} />
+              <meshStandardMaterial color={WORLD.lampGlow} emissive={WORLD.lampEmissive} emissiveIntensity={0.9} />
             </mesh>
           </group>
         </group>
@@ -110,7 +111,7 @@ const Villagers = () => {
         x: t.x + ((i % 3) - 1) * 3.4,
         z: t.z + ((i % 5) - 2) * 2.6,
         yaw: (i * 1.37) % 6.28,
-        color: ['#8B7A63', '#6E7F6A', '#A07A6B', '#7A6C86'][i % 4],
+        color: [WORLD.personA, WORLD.personB, WORLD.personC, WORLD.personD][i % 4],
       })),
     [],
   )
@@ -143,7 +144,7 @@ const Villagers = () => {
       </instancedMesh>
       <instancedMesh ref={heads} args={[undefined, undefined, spots.length]} castShadow>
         <sphereGeometry args={[0.2, 12, 10]} />
-        <meshStandardMaterial color="#DDB894" roughness={0.9} />
+        <meshStandardMaterial color={WORLD.skinWarm} roughness={0.9} />
       </instancedMesh>
     </group>
   )
@@ -187,7 +188,7 @@ const Rig = () => {
     <group>
       <color attach="background" args={[atm.sky]} />
       <fog attach="fog" args={[atm.fog, 220, 1500]} />
-      <hemisphereLight args={[atm.sky, '#5C6B48', atm.ambient]} />
+      <hemisphereLight args={[atm.sky, WORLD.groundShade, atm.ambient]} />
       <ambientLight intensity={0.3} />
       <directionalLight
         position={[LAKE.cx + 320, 420, LAKE.cz - 380]}

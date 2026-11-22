@@ -1,29 +1,35 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import * as THREE from 'three'
+import type * as THREE from 'three'
 import { speedMultiplier } from '@shared/formulas'
 import { isWalkable } from '@world/collision'
 import { useGameStore } from '../store'
 import { cameraRef, playerRef, syncPlayerRef } from '../world-ref'
+import { WORLD } from '@world/palette'
 
 const blocked = (x: number, z: number): boolean => !isWalkable(x, z)
+
+const prefersReducedMotion = (): boolean =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    : false
 
 const keys = new Set<string>()
 
 const playerColor = (persona: string): string => {
   switch (persona) {
     case 'PHOTOGRAPHER':
-      return '#6C7A89'
+      return WORLD.outfitStudent
     case 'PHO_VENDOR':
-      return '#C97B63'
+      return WORLD.outfitSmith
     case 'SILVERSMITH':
-      return '#7C8B9E'
+      return WORLD.outfitCyclo
     case 'CYCLO_DRIVER':
-      return '#5E7E6B'
+      return WORLD.outfitCycloGreen
     case 'FOLK_SINGER':
-      return '#9A6F86'
+      return WORLD.outfitSinger
     default:
-      return '#4E7C6B'
+      return WORLD.outfitDefault
   }
 }
 
@@ -32,7 +38,8 @@ export const Player = () => {
   const body = useRef<THREE.Group>(null)
   const { camera, gl } = useThree()
   const persona = useGameStore((s) => s.player.persona)
-  const reduceMotion = false
+  // F9: respect the player setting and the OS preference, not a hard-coded false
+  const reduceMotion = useGameStore((s) => s.settings.reduceMotion) || prefersReducedMotion()
   const bobT = useRef(0)
   const lastScan = useRef(0)
   const dragging = useRef(false)
@@ -196,15 +203,15 @@ export const Player = () => {
         </mesh>
         <mesh position={[0, 1.62, 0]} castShadow>
           <sphereGeometry args={[0.24, 16, 12]} />
-          <meshStandardMaterial color="#E8C39E" roughness={0.8} />
+          <meshStandardMaterial color={WORLD.skin} roughness={0.8} />
         </mesh>
         <mesh position={[0, 1.86, 0]} castShadow>
           <coneGeometry args={[0.46, 0.22, 18]} />
-          <meshStandardMaterial color="#EADFC0" roughness={0.9} />
+          <meshStandardMaterial color={WORLD.facadeCream} roughness={0.9} />
         </mesh>
         <mesh position={[0, 1.12, -0.18]} castShadow>
           <boxGeometry args={[0.34, 0.42, 0.18]} />
-          <meshStandardMaterial color="#8A6A4A" roughness={0.9} />
+          <meshStandardMaterial color={WORLD.hairDark} roughness={0.9} />
         </mesh>
       </group>
     </group>

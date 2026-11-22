@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { BUILDINGS, facadeColor, TREES } from '@world/data/hoanKiem'
 import { STREETS } from '@world/data/streets'
+import { WORLD } from '@world/palette'
 
 const DEG = Math.PI / 180
 
@@ -30,7 +31,7 @@ const Buildings = () => {
       scale.set(b.w + 0.9, 0.45, b.d + 0.9)
       matrix.compose(pos, quat, scale)
       roofs.current?.setMatrixAt(i, matrix)
-      roofs.current?.setColorAt(i, color.set(b.palette % 2 === 0 ? '#B4674E' : '#A25C48'))
+      roofs.current?.setColorAt(i, color.set(b.palette % 2 === 0 ? WORLD.roofA : WORLD.roofB))
     })
 
     body.current.instanceMatrix.needsUpdate = true
@@ -77,7 +78,7 @@ const Trees = () => {
       scale.set(s, s * 0.86, s)
       matrix.compose(pos, quat, scale)
       leaves.current?.setMatrixAt(i, matrix)
-      const green = t.hue > 0.62 ? '#8FD44A' : t.hue > 0.3 ? '#63B944' : '#4E9F35'
+      const green = t.hue > 0.62 ? WORLD.leafHueWarm : t.hue > 0.3 ? WORLD.leafHueMid : WORLD.leafHueCool
       leaves.current?.setColorAt(i, color.set(green))
     })
 
@@ -90,7 +91,7 @@ const Trees = () => {
     <group>
       <instancedMesh ref={trunks} args={[undefined, undefined, TREES.length]} castShadow>
         <cylinderGeometry args={[0.42, 0.62, 4.8, 6]} />
-        <meshStandardMaterial color="#7A6247" roughness={1} />
+        <meshStandardMaterial color={WORLD.soil} roughness={1} />
       </instancedMesh>
       <instancedMesh ref={leaves} args={[undefined, undefined, TREES.length]} castShadow receiveShadow>
         <icosahedronGeometry args={[1, 1]} />
@@ -126,7 +127,7 @@ const Roads = () => {
       {segments.map((s, i) => (
         <mesh key={i} position={[s.x, 0.03, s.z]} rotation={[-Math.PI / 2, 0, -s.angle]} receiveShadow>
           <planeGeometry args={[s.width, s.len]} />
-          <meshStandardMaterial color="#B9B0A0" roughness={1} />
+          <meshStandardMaterial color={WORLD.kerbStone} roughness={1} />
         </mesh>
       ))}
     </group>
@@ -138,15 +139,15 @@ const OldGate = () => (
   <group position={[2696, 0, 1006]} rotation={[0, -0.2, 0]}>
     <mesh position={[0, 5, 0]} castShadow receiveShadow>
       <boxGeometry args={[16, 10, 6]} />
-      <meshStandardMaterial color="#B7A88C" roughness={1} />
+      <meshStandardMaterial color={WORLD.pavement} roughness={1} />
     </mesh>
     <mesh position={[0, 7.4, 3.1]} castShadow>
       <boxGeometry args={[6.4, 5.2, 0.5]} />
-      <meshStandardMaterial color="#4B4238" roughness={1} />
+      <meshStandardMaterial color={WORLD.asphalt} roughness={1} />
     </mesh>
     <mesh position={[0, 10.6, 0]} castShadow>
       <boxGeometry args={[18, 1.2, 7.6]} />
-      <meshStandardMaterial color="#8E7F66" roughness={1} />
+      <meshStandardMaterial color={WORLD.metalGrey} roughness={1} />
     </mesh>
   </group>
 )

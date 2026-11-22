@@ -21,6 +21,14 @@ export interface Toast {
   tone: 'info' | 'reward'
 }
 
+export interface Settings {
+  reduceMotion: boolean
+  sfx: boolean
+  language: 'vi' | 'en'
+}
+
+export const DEFAULT_SETTINGS: Settings = { reduceMotion: false, sfx: true, language: 'vi' }
+
 export interface ClockState {
   minutes: number
   day: number
@@ -66,6 +74,7 @@ export interface GameStore {
   loadedTiles: number
   earnedToday: number
   hasSave: boolean
+  settings: Settings
 
   setPhase: (phase: Phase) => void
   startNew: (name: string, persona: Persona) => void
@@ -81,6 +90,7 @@ export interface GameStore {
   closeDialogue: () => void
   toggleJournal: () => void
   toggleMap: () => void
+  updateSettings: (patch: Partial<Settings>) => void
   quickEat: () => void
   photoAttempt: () => void
 
@@ -125,6 +135,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   loadedTiles: 0,
   earnedToday: 0,
   hasSave: NO_SAVE !== null,
+  settings: NO_SAVE?.settings ?? DEFAULT_SETTINGS,
 
   setPhase: (phase) => set({ phase }),
 
@@ -165,6 +176,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       clock: save.clock,
       quests: Object.keys(quests).length > 0 ? quests : initialQuests(),
       pieces: save.pieces,
+      settings: save.settings,
       dialogue: null,
       toasts: [],
     })
@@ -185,7 +197,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       quests: Object.values(quests),
       pieces,
       clock,
-      settings: { reduceMotion: false, sfx: true, language: 'vi' },
+      settings: get().settings,
     }
     try {
       writeSave(save)
@@ -201,14 +213,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const next = decayNeeds(player.needs, minutes)
     let total = clock.minutes + minutes
     let day = clock.day
+    let rolled = false
     while (total >= 1440) {
       total -= 1440
       day += 1
+      rolled = true
     }
     set({
       player: { ...player, needs: next },
       clock: { ...clock, minutes: total, day },
+      // F4: the daily income cap is per in-game day. Without this reset the cap
+      // stayed spent forever and every reward after day one was cut to 20%.
+      earnedToday: rolled ? 0 : get().earnedToday,
     })
+    if (rolled) {
+      get().addToast({
+        title: `Ngày ${day} bắt đầu`,
+        message: 'Một ngày mới ở Hà Nội. Thu nhập hôm nay được tính lại từ đầu.',
+        tone: 'info',
+      })
+    }
   },
 
   scanNearestPoi: (x, z) => {
@@ -376,6 +400,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   toggleJournal: () => set({ journalOpen: !get().journalOpen, mapOpen: false }),
 
   toggleMap: () => set({ mapOpen: !get().mapOpen, journalOpen: false }),
+
+  updateSettings: (patch) => set({ settings: { ...get().settings, ...patch } }),
 
   quickEat: () => {
     const { player } = get()

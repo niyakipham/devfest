@@ -46,11 +46,12 @@ describe('save system', () => {
       key: () => null,
       length: 0,
     } as unknown as Storage
-    ;(globalThis as { localStorage?: Storage }).localStorage = broken
+    const g = globalThis as { localStorage?: Storage }
+    g.localStorage = broken
     try {
       expect(readSave()).toBeNull()
     } finally {
-      ;(globalThis as { localStorage?: Storage }).localStorage = original
+      g.localStorage = original
     }
   })
 

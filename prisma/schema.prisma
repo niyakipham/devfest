@@ -1,5 +1,18 @@
-// Prisma Schema - Hanoi Legends RPG Database
-// Full database design for 60,000 LoC project
+// Prisma schema — hanoi-legends
+//
+// Rewritten in Phase 1.5 (debt repayment). The previous 815-line schema was
+// authored for the abandoned monster-collector prototype: it carried
+// CompanionSpecies / Companion / Move / GachaBanner / GachaPull /
+// BattlePassSeason / BattlePassProgress and an undefined `CharacterSkill`
+// relation, so `prisma validate` could not even parse it.
+//
+// Scope fence (docs/MASTER_PROMPT_HANOI_60K_v3.md §1.5): gacha, loot boxes and
+// pay-to-win are NEVER allowed in this project, so those tables are deleted, not
+// migrated. They remain in git history (commit a412d0e) if anyone needs the
+// reference.
+//
+// The live game is PlayerProfile-centric: one save slot holds needs, craft level,
+// reputation and pieces; money only ever moves through the double-entry ledger.
 
 generator client {
   provider = "prisma-client-js"
@@ -10,626 +23,186 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============ AUTH & USER ============
+// ============================== IDENTITY ==============================
+
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  username      String    @unique
-  passwordHash  String
-  role          UserRole  @default(PLAYER)
-  isBanned      Boolean   @default(false)
-  banReason     String?
-  createdAt     DateTime  @default(now())
-  lastLogin     DateTime?
-  
-  character     Character?
-  guild         GuildMember[]
-  friends       Friend[] @relation("userFriends")
-  friendsOf     Friend[] @relation("friendOf")
-  marketplaceListings MarketplaceListing[]
-  battlePass    BattlePassProgress?
-  gachaHistory  GachaPull[]
-  
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String
+  role         Role     @default(PLAYER)
+  isBanned     Boolean  @default(false)
+  banReason    String?
+  // NĐ 147/2024 requires full name, date of birth and a Vietnamese phone number
+  // at registration. Stored hashed/encrypted at rest, never returned by the API.
+  fullName     String?
+  dateOfBirth  DateTime?
+  phone        String?
+  guardianId   String?
+  createdAt    DateTime @default(now())
+  lastLogin    DateTime?
+
+  profile   PlayerProfile?
+  saves     SaveSlot[]
+  wallet    Wallet?
+  purchases Purchase[]
+  posts     PhotoPost[]
+  reports   Report[]      @relation("reporter")
+
   @@index([email])
   @@index([username])
 }
 
-enum UserRole {
+enum Role {
   PLAYER
+  CREATOR
+  SUPPORT
   MODERATOR
   ADMIN
   SUPER_ADMIN
 }
 
-// ============ CHARACTER ============
-model Character {
-  id              String    @id @default(cuid())
-  userId          String    @unique
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  name            String
-  level           Int       @default(1)
-  xp              Int       @default(0)
-  xpToNextLevel   Int       @default(100)
-  
-  // Stats
-  health          Int       @default(100)
-  maxHealth       Int       @default(100)
-  energy          Int       @default(100)
-  maxEnergy       Int       @default(100)
-  
-  // Position
-  zoneId          String    @default("zone_pho_co")
-  positionX       Float     @default(0)
-  positionY       Float     @default(0)
-  positionZ       Float     @default(0)
-  
-  // Avatar (JSON)
-  avatarJson      Json
-  
-  // Base stats
-  strength        Int       @default(5)
-  agility         Int       @default(5)
-  intelligence    Int       @default(5)
-  charisma        Int       @default(5)
-  luck            Int       @default(5)
-  
-  // Currency
-  currency        Int       @default(500)   // Xu Hà Thành
-  premiumCurrency Int       @default(50)    // Ngọc Rồng
-  
-  // Title & achievements
-  title           String    @default("Novice Explorer")
-  achievementIds  String[]  @default([])
-  
-  // Streak
-  loginStreak     Int       @default(0)
-  lastLoginDate   DateTime?
-  
-  createdAt       DateTime  @default(now())
-  lastPlayed      DateTime  @default(now())
-  
-  // Relations
-  companions      Companion[]
-  inventory       InventoryItem[]
-  activeQuests    QuestProgress[]
-  completedQuests CompletedQuest[]
-  factionReps     FactionReputation[]
-  skills          CharacterSkill[]
-  battlePass      BattlePassProgress?
-  
-  @@index([userId])
-  @@index([zoneId])
-  @@index([level])
+// ============================== PLAYER ==============================
+
+model PlayerProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String   @db.VarChar(24)
+  persona   Persona  @default(STUDENT)
+  bio       String?  @db.VarChar(200)
+  inCharacter Boolean @default(true)
+
+  // three progression axes (no combat level, ever)
+  craftLevel Int @default(1)
+  craftXp    Int @default(0)
+  pieces     String[] @default([])
+
+  settingsJson Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  crafts     CraftProgress[]
+  reputations Reputation[]
+  wardrobe   WardrobeItem[]
+  housing    Housing?
+  quests     QuestInstance[]
+  photos     PhotoPost[]
+  inventory  InventoryItem[]
+
+  @@index([persona])
 }
 
-// ============ COMPANIONS ============
-model CompanionSpecies {
-  id              String    @id
-  name            String
-  element         Element
-  rarity          Rarity
-  baseHp          Int
-  baseAttack      Int
-  baseDefense     Int
-  baseSpeed       Int
-  baseSpAttack    Int
-  baseSpDefense   Int
-  
-  evolutionChain  String[]  // Species IDs in order
-  learnableMoves  String[]  // Move IDs
-  
-  description     String
-  lore            String
-  habitat         String
-  captureRate     Float     @default(0.5)
-  
-  companions      Companion[]
-  
-  @@index([element])
-  @@index([rarity])
+/// One row per profession a player has practiced (blueprint §2.5 RP-04).
+model CraftProgress {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  persona   Persona
+  level     Int     @default(1)
+  xp        Int     @default(0)
+
+  @@unique([profileId, persona])
+  @@index([profileId])
 }
 
-enum Element {
-  KIM
-  MOC
-  THUY
-  HOA
-  THO
+enum Persona {
+  STUDENT
+  SILVERSMITH
+  PHO_VENDOR
+  CYCLO_DRIVER
+  PHOTOGRAPHER
+  FOLK_SINGER
 }
 
-enum Rarity {
-  COMMON
-  RARE
-  EPIC
-  LEGENDARY
-  MYTHIC
+/// Five factions, −100…+100, decays 1/day without interaction (§2.6 NPC-07).
+model Reputation {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  faction   Faction
+  value     Int     @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([profileId, faction])
 }
 
-model Companion {
-  id              String    @id @default(cuid())
-  characterId     String
-  character       Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  
-  speciesId       String
-  species         CompanionSpecies @relation(fields: [speciesId], references: [id])
-  
-  nickname        String
-  level           Int       @default(1)
-  xp              Int       @default(0)
-  bondLevel       Int       @default(0)  // 0-100
-  
-  evolutionStage  Int       @default(0)
-  
-  // Current stats (modified by training)
-  currentHp       Int
-  currentAttack   Int
-  currentDefense  Int
-  currentSpeed    Int
-  currentSpAttack Int
-  currentSpDefense Int
-  
-  // Moves (JSON array of move IDs + PP)
-  movesJson       Json
-  
-  isShiny         Boolean   @default(false)
-  isFavorite      Boolean   @default(false)
-  
-  caughtAt        DateTime  @default(now())
-  caughtLocation  String
-  
-  @@index([characterId])
-  @@index([speciesId])
-  @@index([level])
+enum Faction {
+  RESIDENT
+  MERCHANT
+  ARTISAN
+  YOUTH
+  HERITAGE
 }
 
-// ============ MOVES ============
-model Move {
-  id          String  @id
-  name        String
-  element     Element
-  power       Int
-  accuracy    Int
-  pp          Int
-  maxPp       Int
-  description String
-  effectsJson Json?   // Move effects
-  
-  companions  Companion[]
+model WardrobeItem {
+  id          String  @id @default(cuid())
+  profileId   String
+  profile     PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  catalogId   String
+  slot        ClothingSlot
+  dye         String?
+  isEquipped  Boolean @default(false)
+  acquiredAt  DateTime @default(now())
+
+  @@unique([profileId, catalogId])
+  @@index([profileId, slot])
 }
 
-// ============ INVENTORY ============
+enum ClothingSlot {
+  TOP
+  BOTTOM
+  SHOES
+  HAT
+  BAG
+  ACCESSORY
+}
+
+model Housing {
+  id          String  @id @default(cuid())
+  profileId   String  @unique
+  profile     PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  district    String
+  rentPerDay  Int
+  layoutJson  Json
+  comfort     Int     @default(0)
+}
+
+/// items the player owns; the catalog itself is static content, not a table
 model Item {
-  id          String  @id
-  name        String
-  description String
-  type        ItemType
-  rarity      Rarity  @default(COMMON)
-  icon        String
-  stackable   Boolean @default(true)
-  maxStack    Int     @default(99)
-  sellPrice   Int     @default(0)
-  buyPrice    Int     @default(0)
-  
-  inventory   InventoryItem[]
-  marketplace MarketplaceListing[]
-  crafting    CraftingRecipe[] @relation("product")
-  craftingMat CraftingMaterial[]
+  id        String   @id
+  name      String
+  nameEn    String?
+  kind      ItemKind
+  icon      String
+  stackable Boolean  @default(true)
+
+  holdings InventoryItem[]
 }
 
-enum ItemType {
-  WEAPON
-  ARMOR
-  CONSUMABLE
-  QUEST_ITEM
-  COLLECTIBLE
+enum ItemKind {
+  FOOD
   MATERIAL
-  COMPANION_ITEM
+  TOOL
   COSMETIC
+  TICKET
 }
 
 model InventoryItem {
-  id          String    @id @default(cuid())
-  characterId String
-  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  
-  itemId      String
-  item        Item      @relation(fields: [itemId], references: [id])
-  
-  slot        Int
-  quantity    Int       @default(1)
-  
-  @@unique([characterId, slot])
-  @@index([characterId])
+  id        String  @id @default(cuid())
+  profileId String
+  profile   PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      Item    @relation(fields: [itemId], references: [id])
+  quantity  Int     @default(1)
+  slot      Int?
+
+  @@unique([profileId, itemId])
+  @@index([profileId])
 }
 
-// ============ QUESTS ============
-model Quest {
-  id              String    @id
-  type            QuestType
-  chapter         Int?
-  title           String
-  description     String
-  detailedDesc    String
-  
-  zoneId          String
-  giverNpcId      String
-  
-  // Prerequisites (JSON)
-  prerequisitesJson Json
-  
-  // Objectives (JSON)
-  objectivesJson    Json
-  
-  // Rewards
-  rewardXp          Int
-  rewardCurrency    Int
-  rewardItemsJson   Json  // [{itemId, quantity}]
-  rewardCompanionId String?
-  rewardRepJson     Json? // {factionId, amount}
-  
-  factionId         String?
-  reputationRequired Int   @default(0)
-  levelRequired     Int   @default(1)
-  
-  repeatable        Boolean @default(false)
-  resetInterval     String? // "daily", "weekly"
-  
-  // Dialogue (JSON)
-  dialogueJson      Json
-  
-  progress      QuestProgress[]
-  completed     CompletedQuest[]
-  
-  @@index([type])
-  @@index([zoneId])
-  @@index([levelRequired])
-}
-
-enum QuestType {
-  MAIN
-  SIDE
-  DAILY
-  WEEKLY
-  FACTION
-  DYNAMIC
-}
-
-model QuestProgress {
-  id          String    @id @default(cuid())
-  characterId String
-  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  
-  questId     String
-  quest       Quest     @relation(fields: [questId], references: [id])
-  
-  status      QuestStatus @default(ACCEPTED)
-  objectivesJson Json    // Current progress per objective
-  
-  startedAt   DateTime  @default(now())
-  
-  @@unique([characterId, questId])
-  @@index([characterId])
-}
-
-enum QuestStatus {
-  ACCEPTED
-  IN_PROGRESS
-  COMPLETED
-  FAILED
-}
-
-model CompletedQuest {
-  id          String    @id @default(cuid())
-  characterId String
-  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  
-  questId     String
-  quest       Quest     @relation(fields: [questId], references: [id])
-  
-  completedAt DateTime  @default(now())
-  
-  @@unique([characterId, questId])
-}
-
-// ============ FACTIONS ============
-model Faction {
-  id          String  @id
-  name        String
-  description String
-  icon        String
-  color       String
-  
-  reputation  FactionReputation[]
-  quests      Quest[]
-  
-  // Reputation thresholds
-  thresholds  Json    // {name: string, repRequired: int, title: string}[]
-}
-
-model FactionReputation {
-  id          String    @id @default(cuid())
-  characterId String
-  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  
-  factionId   String
-  faction     Faction   @relation(fields: [factionId], references: [id])
-  
-  reputation  Int       @default(0)
-  title       String    @default("Stranger")
-  
-  @@unique([characterId, factionId])
-}
-
-// ============ SOCIAL ============
-model Guild {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  description String    @default("")
-  leaderId    String
-  level       Int       @default(1)
-  xp          Int       @default(0)
-  maxMembers  Int       @default(20)
-  
-  createdAt   DateTime  @default(now())
-  
-  members     GuildMember[]
-  chatMessages GuildChatMessage[]
-  
-  @@index([leaderId])
-}
-
-model GuildMember {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  guildId     String
-  guild       Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
-  
-  role        GuildRole @default(MEMBER)
-  joinedAt    DateTime  @default(now())
-  contribution Int      @default(0)
-  
-  @@unique([userId, guildId])
-}
-
-enum GuildRole {
-  LEADER
-  OFFICER
-  MEMBER
-}
-
-model Friend {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation("userFriends", fields: [userId], references: [id], onDelete: Cascade)
-  
-  friendId    String
-  friend      User      @relation("friendOf", fields: [friendId], references: [id], onDelete: Cascade)
-  
-  status      FriendStatus @default(PENDING)
-  createdAt   DateTime  @default(now())
-  
-  @@unique([userId, friendId])
-}
-
-enum FriendStatus {
-  PENDING
-  ACCEPTED
-  BLOCKED
-}
-
-model ChatMessage {
-  id          String    @id @default(cuid())
-  channel     ChatChannel
-  senderId    String
-  content     String
-  
-  guildId     String?
-  zoneId      String?
-  
-  createdAt   DateTime  @default(now())
-  
-  @@index([channel])
-  @@index([createdAt])
-}
-
-enum ChatChannel {
-  GLOBAL
-  ZONE
-  PARTY
-  GUILD
-  PRIVATE
-}
-
-model GuildChatMessage {
-  id          String    @id @default(cuid())
-  guildId     String
-  guild       Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
-  
-  senderId    String
-  content     String
-  createdAt   DateTime  @default(now())
-  
-  @@index([guildId])
-}
-
-// ============ MARKETPLACE ============
-model MarketplaceListing {
-  id          String    @id @default(cuid())
-  sellerId    String
-  seller      User      @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  
-  itemId      String
-  item        Item      @relation(fields: [itemId], references: [id])
-  
-  quantity    Int
-  price       Int
-  status      ListingStatus @default(ACTIVE)
-  
-  createdAt   DateTime  @default(now())
-  expiresAt   DateTime
-  
-  @@index([sellerId])
-  @@index([itemId])
-  @@index([status])
-}
-
-enum ListingStatus {
-  ACTIVE
-  SOLD
-  EXPIRED
-  CANCELLED
-}
-
-// ============ CRAFTING ============
-model CraftingRecipe {
-  id          String  @id
-  name        String
-  productId   String
-  product     Item    @relation("product", fields: [productId], references: [id])
-  
-  materials   CraftingMaterial[]
-  craftTime   Int     @default(0) // seconds
-  levelReq    Int     @default(1)
-  
-  @@index([productId])
-}
-
-model CraftingMaterial {
-  id          String  @id @default(cuid())
-  recipeId    String
-  recipe      CraftingRecipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  
-  itemId      String
-  item        Item    @relation(fields: [itemId], references: [id])
-  
-  quantity    Int
-  
-  @@unique([recipeId, itemId])
-}
-
-// ============ BATTLE PASS ============
-model BattlePassSeason {
-  id          String    @id
-  name        String
-  theme       String
-  startDate   DateTime
-  endDate     DateTime
-  isActive    Boolean   @default(false)
-  
-  // Rewards per tier (JSON)
-  freeRewardsJson   Json
-  premiumRewardsJson Json
-  
-  price             Int @default(299000) // VND
-  
-  progresses        BattlePassProgress[]
-  
-  @@index([isActive])
-}
-
-model BattlePassProgress {
-  id          String    @id @default(cuid())
-  characterId String    @unique
-  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  
-  seasonId    String
-  season      BattlePassSeason @relation(fields: [seasonId], references: [id])
-  
-  level       Int       @default(0)
-  xp          Int       @default(0)
-  isPremium   Boolean   @default(false)
-  claimedTiers Int[]    @default([])
-  
-  @@index([seasonId])
-}
-
-// ============ GACHA ============
-model GachaBanner {
-  id          String    @id
-  name        String
-  type        GachaType
-  startDate   DateTime
-  endDate     DateTime
-  isActive    Boolean   @default(false)
-  
-  // Featured species with rates
-  ratesJson   Json  // [{speciesId, rate, rarity}]
-  
-  pulls       GachaPull[]
-  
-  @@index([isActive])
-}
-
-enum GachaType {
-  STANDARD
-  LIMITED
-  EVENT
-}
-
-model GachaPull {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  bannerId    String
-  banner      GachaBanner @relation(fields: [bannerId], references: [id])
-  
-  resultSpeciesId String
-  resultRarity    Rarity
-  
-  pityCount   Int       @default(0)
-  isGuaranteed Boolean @default(false)
-  
-  pulledAt    DateTime  @default(now())
-  
-  @@index([userId])
-  @@index([bannerId])
-}
-
-// ============ SEASONAL EVENTS ============
-model SeasonalEvent {
-  id          String    @id
-  name        String
-  description String
-  startDate   DateTime
-  endDate     DateTime
-  isActive    Boolean   @default(false)
-  
-  configJson  Json  // Event-specific config
-  
-  @@index([isActive])
-}
-
-// ============ ANALYTICS ============
-model AnalyticsEvent {
-  id          String    @id @default(cuid())
-  userId      String
-  eventType   String
-  eventData   Json
-  createdAt   DateTime  @default(now())
-  
-  @@index([userId])
-  @@index([eventType])
-  @@index([createdAt])
-}
-
-model DailyStats {
-  date        DateTime  @id @default(now())
-  dau         Int       @default(0)
-  mau         Int       @default(0)
-  newUsers    Int       @default(0)
-  revenue     Float     @default(0)
-  sessions    Int       @default(0)
-  avgSession  Float     @default(0) // minutes
-}
-
-// =====================================================================
-// PHASE 1 — COZY RP CORE (additive; legacy monster-collector models above
-// stay untouched until the Phase 2 content migration)
-// =====================================================================
+// ============================== WORLD ==============================
 
 model WorldTile {
   id        String   @id // "t_07_04"
@@ -639,27 +212,29 @@ model WorldTile {
   poiCount  Int      @default(0)
   updatedAt DateTime @updatedAt
 
+  pois Poi[]
+
   @@unique([x, z])
   @@index([version])
 }
 
 model Poi {
-  id           String   @id @default(cuid())
+  id           String  @id
   tileId       String
+  tile         WorldTile @relation(fields: [tileId], references: [id])
   type         PoiType
   name         String
   nameEn       String?
   x            Float
   z            Float
-  radius       Float    @default(4.5)
+  radius       Float   @default(2)
   district     String
   street       String?
   craft        String?
   action       String?
-  hoursStart   Int?
-  hoursEnd     Int?
-  payload      Json?
-  isActive     Boolean  @default(true)
+  hoursJson    Json? // [[openMinute, closeMinute]]
+  payloadJson  Json?
+  isActive     Boolean @default(true)
 
   @@index([tileId, type])
   @@index([district])
@@ -677,81 +252,135 @@ enum PoiType {
   TRANSPORT
 }
 
-model PlayerProfile {
-  id          String  @id @default(cuid())
-  userId      String  @unique
-  name        String  @db.VarChar(24)
-  persona     Persona @default(STUDENT)
-  bio         String? @db.VarChar(200)
-  inCharacter Boolean @default(true)
-  craftLevel  Int     @default(1)
-  craftXp     Int     @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+// ============================== NARRATIVE ==============================
 
-  wallet      Wallet?
-  saves       SaveSlot[]
+model Npc {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  name         String
+  nameEn       String?
+  district     String
+  street       String?
+  scheduleJson Json // timetable 24h × 7 × season
+  memoryJson   Json? // last 12 player events
+  faction      Faction?
+  isActive     Boolean  @default(true)
 }
 
-enum Persona {
-  STUDENT
-  SILVERSMITH
-  PHO_VENDOR
-  CYCLO_DRIVER
-  PHOTOGRAPHER
-  FOLK_SINGER
+model QuestDef {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  title       String
+  titleEn     String?
+  type        QuestType
+  graphJson   Json // objectives + dialogue refs
+  rewardsJson Json // { dong, xp, piece?, reputation? }
+  isPublished Boolean  @default(false)
+
+  instances QuestInstance[]
 }
+
+enum QuestType {
+  MAIN
+  SIDE
+  DAILY
+  WEEKLY
+  FESTIVAL
+}
+
+model QuestInstance {
+  id        String     @id @default(cuid())
+  profileId String
+  profile   PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  questKey  String
+  quest     QuestDef  @relation(fields: [questKey], references: [key])
+  state     QuestState @default(AVAILABLE)
+  progressJson Json
+  startedAt DateTime?
+  claimedAt DateTime?
+
+  @@unique([profileId, questKey])
+  @@index([profileId, state])
+}
+
+enum QuestState {
+  LOCKED
+  AVAILABLE
+  ACTIVE
+  COMPLETE
+  CLAIMED
+  FAILED
+}
+
+// ============================== SAVE ==============================
 
 model SaveSlot {
-  id         String   @id @default(cuid())
-  profileId  String
-  profile    PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  slot       Int
-  version    Int      @default(1)
-  payload    Json
-  updatedAt  DateTime @updatedAt
-
-  @@unique([profileId, slot])
-}
-
-// Double-entry ledger: every row belongs to a transaction whose deltas sum to 0.
-model Wallet {
-  id        String   @id @default(cuid())
-  profileId String   @unique
-  profile   PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  dong      BigInt   @default(0)
-  hoaSen    Int      @default(0)
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slot      Int
+  version   Int    @default(1)
+  payload   Json // SaveGameV1, validated by zod before it is written
   updatedAt DateTime @updatedAt
 
-  entries   LedgerEntry[]
+  @@unique([userId, slot])
+  @@index([userId])
 }
 
+// ============================== ECONOMY ==============================
+
+model Wallet {
+  id        String @id @default(cuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dong      BigInt @default(0)
+  hoaSen    Int    @default(0)
+
+  entries LedgerEntry[]
+}
+
+/// Double-entry: every transaction writes two lines that sum to zero and is
+/// protected by a unique idempotency key. Rows are never updated, only reversed.
 model LedgerEntry {
   id             String   @id @default(cuid())
-  walletId       String?
-  wallet         Wallet?  @relation(fields: [walletId], references: [id])
+  walletId       String
+  wallet         Wallet   @relation(fields: [walletId], references: [id])
   transactionId  String
-  account        String   // wallet:<id> | system:faucet | system:shop
-  deltaDong      BigInt
+  account        String
+  deltaDong      BigInt   @default(0)
+  deltaHoaSen    Int      @default(0)
   reason         String
+  refType        String?
+  refId          String?
   idempotencyKey String   @unique
+  balanceAfter   Json?
   createdAt      DateTime @default(now())
 
+  @@index([walletId, createdAt])
   @@index([transactionId])
-  @@index([account, createdAt])
 }
 
 model Purchase {
-  id          String        @id @default(cuid())
-  userId      String
-  sku         String
-  amountVnd   Int
-  provider    String // VNPAY | MOMO | ZALOPAY | STORE
-  providerRef String?       @unique
-  status      PaymentStatus @default(PENDING)
-  createdAt   DateTime      @default(now())
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sku        String
+  amountVnd  Int
+  currency   String        @default("VND")
+  provider   PaymentProvider
+  status     PaymentStatus @default(PENDING)
+  receiptId  String?       @unique // provider transaction id, unique => no replay
+  vatInvoice String?
+  createdAt  DateTime      @default(now())
 
   @@index([userId, createdAt])
+}
+
+enum PaymentProvider {
+  VNPAY
+  MOMO
+  ZALOPAY
+  STORE
 }
 
 enum PaymentStatus {
@@ -761,33 +390,38 @@ enum PaymentStatus {
   REFUNDED
 }
 
+// ============================== SOCIAL ==============================
+
 model PhotoPost {
-  id         String     @id @default(cuid())
-  userId     String
-  url        String
-  caption    String?    @db.VarChar(140)
-  poiId      String?
-  likes      Int        @default(0)
-  visibility Visibility @default(PUBLIC)
-  createdAt  DateTime   @default(now())
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileId    String
+  profile      PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  url          String
+  caption      String?    @db.VarChar(140)
+  visibility   Visibility @default(FRIENDS)
+  likeCount    Int        @default(0)
+  createdAt    DateTime   @default(now())
 
   @@index([createdAt])
+  @@index([profileId])
 }
 
 enum Visibility {
-  PUBLIC
-  FRIENDS
   PRIVATE
+  FRIENDS
+  PUBLIC
 }
 
 model Report {
   id         String       @id @default(cuid())
   reporterId String
-  targetType String
+  reporter   User         @relation("reporter", fields: [reporterId], references: [id])
+  targetType String // photo | chat | profile
   targetId   String
   reason     String
   status     ReportStatus @default(OPEN)
-  handledBy  String?
   createdAt  DateTime     @default(now())
 
   @@index([status, createdAt])
@@ -796,20 +430,36 @@ model Report {
 enum ReportStatus {
   OPEN
   REVIEWING
-  RESOLVED
-  REJECTED
+  ACTIONED
+  DISMISSED
 }
 
+// ============================== OPS ==============================
+
+/// Append-only. Every admin action lands here.
 model AuditLog {
   id        String   @id @default(cuid())
   actorId   String
   action    String
-  entity    String
-  entityId  String?
-  before    Json?
-  after     Json?
-  ip        String?
+  target    String?
+  metaJson  Json?
   createdAt DateTime @default(now())
 
   @@index([actorId, createdAt])
+}
+
+model FeatureFlag {
+  key       String   @id
+  enabled   Boolean  @default(false)
+  rollout   Int      @default(0) // 0–100 % of players
+  updatedAt DateTime @updatedAt
+}
+
+model DailyStats {
+  date        DateTime @id @db.Date
+  dau         Int      @default(0)
+  sessions    Int      @default(0)
+  dongMinted  BigInt   @default(0)
+  dongBurned  BigInt   @default(0)
+  conversion  Float    @default(0)
 }

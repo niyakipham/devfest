@@ -27,5 +27,16 @@ export default defineConfig({
   build: {
     target: 'esnext',
     sourcemap: true,
+    // Phase 1.5 (F8): the single 1.07 MB chunk delayed first paint because the
+    // title art waited behind three.js. Three vendors are split so the HUD shell
+    // paints while the 3D bundle streams in.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ['three', '@react-three/fiber'],
+          react: ['react', 'react-dom', 'zustand'],
+        },
+      },
+    },
   },
 })

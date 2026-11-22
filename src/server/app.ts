@@ -5,6 +5,7 @@
 import express, { type NextFunction, type Request, type Response } from 'express'
 import cors from 'cors'
 import { AuthLogin, AuthRegister, SavePushRequest } from '@shared/contracts'
+import { CATALOG, findSku } from '@shared/catalog'
 import { POIS } from '@world/data/hoanKiem'
 import { TILE_SIZE, tileAt, tileBounds } from '@world/grid'
 import { memoryStore } from './repo/memory'
@@ -157,19 +158,29 @@ export const createApp = () => {
     res.json({ dong: ledger.balance(res.locals.user.id), entries: ledger.history(res.locals.user.id) })
   })
 
+  /**
+   * Server-authoritative pricing (F4).
+   * The client sends a SKU only. A `price` in the body is ignored on purpose:
+   * trusting it let a player buy a 480đ áo dài for 1đ.
+   */
+  app.get('/api/shop/catalog', (_req, res) => {
+    res.json({ entries: CATALOG })
+  })
+
   app.post('/api/shop/purchase', requireUser, (req, res, next) => {
     try {
-      const { sku, price, idempotencyKey } = req.body as {
-        sku?: string
-        price?: number
-        idempotencyKey?: string
-      }
-      if (typeof sku !== 'string' || typeof price !== 'number' || typeof idempotencyKey !== 'string') {
-        res.status(400).json({ error: 'sku, price and idempotencyKey required', code: 'BAD_REQUEST' })
+      const { sku, idempotencyKey } = req.body as { sku?: unknown; idempotencyKey?: unknown }
+      if (typeof sku !== 'string' || typeof idempotencyKey !== 'string' || idempotencyKey.length < 8) {
+        res.status(400).json({ error: 'sku and idempotencyKey (>=8 chars) required', code: 'BAD_REQUEST' })
         return
       }
-      const result = ledger.purchase(res.locals.user.id, price, sku, idempotencyKey)
-      res.json(result)
+      const entry = findSku(sku)
+      if (!entry) {
+        res.status(404).json({ error: `unknown sku ${sku}`, code: 'UNKNOWN_SKU' })
+        return
+      }
+      const result = ledger.purchase(res.locals.user.id, entry.price, entry.sku, idempotencyKey)
+      res.json({ ...result, sku: entry.sku, name: entry.name, charged: entry.price })
     } catch (err) {
       next(err)
     }

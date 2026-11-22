@@ -1,0 +1,64 @@
+name: gate
+
+# Phase 1.5 "trả nợ": every quality gate that used to live only in someone's head
+# is now a command that fails the build. A green run here is the definition of
+# "done" for a change.
+#
+#   lint      — architecture arrows (shared ← world ← rp ← narrative ← game/ui)
+#               plus correctness rules
+#   tsc       — types, including the headless-server constraint
+#   tokens    — one palette, zero raw colours, zero dead tokens
+#   contrast  — 19 measured WCAG AA pairs (catches white-on-green 2.33:1)
+#   schema    — Prisma relations resolve without downloading an engine
+#   world     — the 100-cell map is still coherent
+#   test      — 84 unit + integration tests
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint (architecture + correctness)
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Design tokens (single palette)
+        run: npm run tokens
+
+      - name: Contrast (WCAG AA)
+        run: npm run contrast
+
+      - name: Prisma schema (offline)
+        run: npm run schema
+
+      - name: World integrity
+        run: npm run verify:world
+
+      - name: Tests
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build

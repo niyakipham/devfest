@@ -7,6 +7,11 @@ import { CozyApp } from '@game/CozyApp'
 
 // The 3D canvas needs WebGL, which jsdom does not provide. Everything else is real.
 vi.mock('@game/scene/Scene', () => ({ Scene: () => <div data-testid="scene" /> }))
+// jsdom has no WebGL; the gate is tested directly in boundary.test.tsx
+vi.mock('@game/ui/Boundary', async () => {
+  const actual = await vi.importActual('@game/ui/Boundary')
+  return { ...(actual as object), detectWebGL: () => null }
+})
 
 describe('UI shell (design system)', () => {
   beforeEach(() => {
