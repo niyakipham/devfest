@@ -26,6 +26,8 @@ import {
   type JournalStats,
 } from '@rp/journal'
 import { audioBus } from './audio/bus'
+import { EMPTY_STREAK, evaluateStreakClaim, ictNow, type StreakState } from '@shared/streak'
+import { newCompanion, careCompanion, applyDailyDecay, type CompanionState, type CareAction, type CompanionSpeciesCode } from '@shared/companion'
 import { readSave, writeSave } from './save'
 import { playerRef, resetPlayerRef } from './world-ref'
 
@@ -116,6 +118,10 @@ export interface GameStore {
   journal: JournalEntry[]
   stats: JournalStats
   metNpcs: string[]
+  /** streak milestone state (v3) — never reset by a day rollover; claim on player action */
+  streak: StreakState
+  /** the player's companion spirit (v3) — null = not adopted yet */
+  companion: CompanionState | null
 
   setPhase: (phase: Phase) => void
   startNew: (name: string, persona: Persona) => void
@@ -143,6 +149,10 @@ export interface GameStore {
   placeGarnish: (item: Garnish) => void
   closeShiftWith: (garnish: Garnish[]) => void
   closeShift: () => void
+
+  adoptCompanion: (speciesCode: CompanionSpeciesCode) => void
+  careCompanion: (action: CareAction) => void
+  claimStreakDay: (opts?: { pro?: boolean }) => void
 
   syncTransform: () => void
   setStreamStats: (tile: string, loadedTiles: number) => void
@@ -190,6 +200,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   journal: NO_SAVE?.journal ?? [],
   stats: NO_SAVE?.stats ?? EMPTY_STATS,
   metNpcs: NO_SAVE?.metNpcs ?? [],
+  streak: NO_SAVE?.streak ?? EMPTY_STREAK,
+  companion: NO_SAVE?.companion ?? null,
 
   setPhase: (phase) => set({ phase }),
 
@@ -206,6 +218,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       promptPoi: null,
       earnedToday: 0,
       toasts: [],
+      streak: EMPTY_STREAK,
+      companion: null,
     })
     get().addToast({
       title: 'Hà Nội, 5 giờ 40 sáng',
@@ -234,6 +248,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       journal: save.journal,
       stats: save.stats,
       metNpcs: save.metNpcs,
+      streak: save.streak ?? EMPTY_STREAK,
+      companion: save.companion ?? null,
       dialogue: null,
       toasts: [],
     })
@@ -244,9 +260,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   resume: () => set({ phase: 'PLAYING' }),
 
   saveNow: () => {
-    const { player, clock, quests, pieces, journal, stats, metNpcs } = get()
+    const { player, clock, quests, pieces, journal, stats, metNpcs, streak, companion } = get()
     const save: SaveGameV1 = {
-      version: 2,
+      version: 3,
       slot: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -258,6 +274,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       journal,
       stats,
       metNpcs,
+      streak,
+      companion,
     }
     try {
       writeSave(save)
@@ -288,6 +306,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     })
     if (rolled) {
       audioBus.bell()
+      // Companion decays one day of uncared-for life, never dies.
+      const { companion } = get()
+      if (companion) set({ companion: applyDailyDecay(companion, 1) })
+      // The streak rewards the player for showing up each day.
+      const todayICT = ictNow()
+      const evalResult = evaluateStreakClaim(get().streak, todayICT, { pro: false })
+      if (evalResult.awarded) set({ streak: evalResult.state })
       set({ journal: appendEntry(get().journal, dayEntry(day, makeEntryId)) })
       get().addToast({
         title: `Ngày ${day} bắt đầu`,
@@ -682,6 +707,43 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { player } = get()
     set({ player: { ...player, needs: { ...player.needs, mood: Math.min(100, player.needs.mood + 4) } } })
     get().addToast({ title: `Một tấm ảnh ${poi.name}`, message: 'Ánh sáng đẹp. Bạn lưu vào album.', tone: 'info' })
+  },
+
+  adoptCompanion: (speciesCode) => {
+    set({ companion: newCompanion(speciesCode) })
+    get().addToast({ title: 'Bạn nhận được một con bạn nhỏ', message: 'Một thằng bay theo tới cuối ngày.', tone: 'info' })
+  },
+
+  careCompanion: (action) => {
+    const { companion } = get()
+    if (!companion) {
+      get().addToast({ title: 'Chưa đón companion', message: 'Chọn một mảnh rừng nhỏ để nuôi bên bạn.', tone: 'info' })
+      return
+    }
+    const todayICT = ictNow()
+    const result = careCompanion(companion, action, todayICT)
+    set({ companion: result.state })
+    if (result.xpGained > 0) {
+      get().addToast({
+        title: result.leveledUp ? `Companion lên cấp ${result.state.level}` : 'Cưng nhung',
+        message: result.leveledUp ? 'Cơ thể đã to hơn bên bạn.' : 'Cơ thể khá hơn.',
+        tone: 'reward',
+      })
+    }
+  },
+
+  claimStreakDay: (opts = {}) => {
+    const todayICT = ictNow()
+    const result = evaluateStreakClaim(get().streak, todayICT, opts)
+    if (!result.awarded) return
+    set({ streak: result.state })
+    if (result.reason === 'milestone') {
+      get().addToast({
+        title: 'Kỷ lục 7 ngày chỗi',
+        message: `Bạn ghi thêm ${result.bonusPoints} điểm.`,
+        tone: 'reward',
+      })
+    }
   },
 
   syncTransform: () => {
