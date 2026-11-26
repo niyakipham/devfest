@@ -30,6 +30,7 @@ export const WORLD = {
   waterFoam: '#99DAE8',
   waterGlow: '#B6ECFA',
   lakeShore: '#D8CEA6',
+  tealDeep: '#0E7FA8',
 
   // terrain
   sand: '#E5E5BD',
@@ -105,6 +106,20 @@ export const WORLD = {
   outfitSinger: '#9A6F86',
   outfitDefault: '#4E7C6B',
   lacquerDark: '#7C3327',
+
+  /* anime-style face (Genshin-inspired, original shapes — no third-party asset) */
+  eyeWhite: '#FEFEF8',
+  eyeGlint: '#FFFFFF',
+  eyeLine: '#241D18',
+  irisAmber: '#8A5A2B',
+  irisDeep: '#52301F',
+  blush: '#E59B80',
+  rimLight: '#CFEAFF',
+  shutterGreen: '#3F6B4F',   /* Hà Nội green shutters */
+  signCream: '#F2E3BB',      /* shop-sign board cream */
+  hullDark: '#1B2A22',       /* inverted-hull outline — dark leaf, not black */
+  cloudWhite: '#FFFFFF',
+  hoaPhuong: '#C8432B',     /* phượng vỹ — the May-June flame of Hà Nội */
 
   // sky (handled by atmosphere.ts, kept here for completeness)
   skyNight: '#24425A',
