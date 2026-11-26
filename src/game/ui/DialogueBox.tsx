@@ -2,6 +2,14 @@ import { useEffect, useState } from 'react'
 import { DIALOGUES } from '../content/dialogue'
 import { useGameStore } from '../store'
 
+/** Speaker → portrait art (public/portraits). Original splash art, not game IP. */
+const SPEAKER_PORTRAIT: Record<string, string> = {
+  'Cô Hoa': '/portraits/persona-pho-vendor.jpg',
+  'Chú Bảy': '/portraits/persona-silversmith.jpg',
+  'Chị Lan': '/portraits/persona-photographer.jpg',
+  'Anh Hùng': '/portraits/persona-cyclo-driver.jpg',
+}
+
 export const DialogueBox = () => {
   const dialogue = useGameStore((s) => s.dialogue)
   const choose = useGameStore((s) => s.choose)
@@ -40,6 +48,8 @@ export const DialogueBox = () => {
 
   if (!node) return null
 
+  const portrait = SPEAKER_PORTRAIT[node.speaker]
+
   const advance = () => {
     if (!lineDone) {
       setShown(fullLine)
@@ -51,6 +61,9 @@ export const DialogueBox = () => {
   return (
     <div className="dialogue" onClick={advance}>
       <div className="panel dialogue__panel" onClick={(e) => e.stopPropagation()}>
+        {portrait && (
+          <img className="dialogue__avatar" src={portrait} alt={`Chân dung ${node.speaker}`} draggable={false} />
+        )}
         <div className="dialogue__speaker">
           <strong>{node.speaker}</strong>
           <span>{node.role}</span>

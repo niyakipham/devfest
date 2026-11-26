@@ -51,6 +51,32 @@ export const HelpIcon = ({ size }: IconProps) => (
   </svg>
 )
 
+export const PotIcon = ({ size }: IconProps) => (
+  <svg {...base(size)} aria-hidden="true">
+    <path d="M4 12.2h16a8 8 0 0 1-4.4 7.2H8.4A8 8 0 0 1 4 12.2Z" />
+    <path d="M8.5 9.4c0-1.5 1-1.6 1-3M12 9.4c0-1.5 1-1.6 1-3M15.5 9.4c0-1.5 1-1.6 1-3" />
+  </svg>
+)
+
+export const CycloIcon = ({ size }: IconProps) => (
+  <svg {...base(size)} aria-hidden="true">
+    <path d="M3.5 10.5c.6-3.6 3.3-5.6 7-5.6s6.4 2 7 5.6" />
+    <path d="M3.5 10.5h14" />
+    <circle cx="6.5" cy="16.8" r="2.4" />
+    <circle cx="15.5" cy="16.8" r="2.4" />
+    <path d="M6.5 14.4v-2M15.5 14.4v-2M15.5 12.4l3-2.2M5 21h14" />
+  </svg>
+)
+
+export const LotusIcon = ({ size }: IconProps) => (
+  <svg {...base(size)} aria-hidden="true">
+    <path d="M12 4.5c1.6 2.3 1.6 5.2 0 7.4-1.6-2.2-1.6-5.1 0-7.4Z" />
+    <path d="M5.5 7.5c2.6.3 4.7 2.3 5.3 5-2.6-.3-4.7-2.4-5.3-5Z" />
+    <path d="M18.5 7.5c-2.6.3-4.7 2.3-5.3 5 2.6-.3 4.7-2.4 5.3-5Z" />
+    <path d="M3 13.5c2.8 3.4 5.6 5 9 5s6.2-1.6 9-5c-1.2 4.6-4.3 7.5-9 7.5s-7.8-2.9-9-7.5Z" />
+  </svg>
+)
+
 export const CloseIcon = ({ size }: IconProps) => (
   <svg {...base(size)} aria-hidden="true">
     <path d="M6 6l12 12M18 6L6 18" />

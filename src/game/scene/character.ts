@@ -23,6 +23,12 @@
  * Vietnamese detail is deliberate and specific, not decorative: nón lá, áo dài with
  * a visible split, áo bà ba, khăn quàng, dép lốp, and the school uniform of a
  * Hanoi student. Nothing here copies a commercial game's asset — only proportions.
+ *
+ * UPDATE (ADR-005) — “Genshin-style” anime face, still original geometry:
+ * oversized almond eyes with a glint, bold upper-lid line, swept bangs and an
+ * ahoge cowlick, plus cel-shaded toon materials (see CharacterMesh). The anime
+ * read lives in the face and the shading, not in copied IP — every silhouette is
+ * built from primitives here, like the rest of the rig.
  */
 import { WORLD } from '@world/palette'
 
@@ -185,6 +191,9 @@ export const hairColor = (tone: number): string => (tone > 0.55 ? HAIR_WARM : HA
 export const skinColor = (tone: number): string =>
   tone > 0.66 ? WORLD.skinWarm : tone > 0.33 ? WORLD.skin : WORLD.skinDeep
 
+/** Iris drifts between warm amber and deep umber; never flat black on black hair. */
+export const irisColor = (tone: number): string => (tone > 0.45 ? WORLD.irisAmber : WORLD.irisDeep)
+
 /* --------------------------------- parts --------------------------------- */
 
 export interface PartSpec {
@@ -196,6 +205,12 @@ export interface PartSpec {
   color: string
   /** slightly rougher cloth, smoother skin/metal */
   rough?: number
+  /** part of the face — skip the inverted-hull outline (an outline around a
+   *  2 cm iris reads as a black smudge, not a line) */
+  noOutline?: boolean
+  /** self-lit paint (iris, glint) — the anime "glowing eye" cue */
+  emissive?: string
+  emissiveIntensity?: number
 }
 
 /**
@@ -274,6 +289,77 @@ export const buildParts = (look: Appearance): PartSpec[] => {
     scale: [0.94, 1.06, 0.98],
     color: skin,
     rough: 0.78,
+  })
+
+  /* ---- anime eyes: the single strongest "Genshin-style" cue at gameplay distance ----
+   * almond sclera → iris → glint, seated on the skull surface. Positions are
+   * derived from the head sphere (rx .1175 / ry .1325 / rz .1225 at this scale):
+   * the surface at x=±0.052, y≈0 lands at z≈0.110, so each layer steps out. */
+  const iris = irisColor(look.tone)
+  for (const side of [-1, 1] as const) {
+    parts.push({
+      geom: 'sphere',
+      args: [0.0235, 8, 6],
+      pos: [side * 0.052, RIG.headY + 0.008, 0.0935],
+      scale: [1, 0.72, 0.55],
+      color: WORLD.eyeWhite,
+      rough: 0.3,
+      noOutline: true,
+    })
+    parts.push({
+      geom: 'sphere',
+      args: [0.0142, 8, 6],
+      pos: [side * 0.052, RIG.headY + 0.006, 0.0995],
+      scale: [1, 1.18, 0.5],
+      color: iris,
+      rough: 0.2,
+      noOutline: true,
+      emissive: iris,
+      emissiveIntensity: 0.38,
+    })
+    // glint — top-left in each eye, always (light never jumps sides)
+    parts.push({
+      geom: 'sphere',
+      args: [0.005, 6, 4],
+      pos: [side * 0.052 - 0.005, RIG.headY + 0.014, 0.1055],
+      color: WORLD.eyeGlint,
+      rough: 0.15,
+      noOutline: true,
+      emissive: WORLD.eyeGlint,
+      emissiveIntensity: 0.8,
+    })
+    // bold upper lid — the anime "liner" that frames the eye
+    parts.push({
+      geom: 'box',
+      args: [0.05, 0.008, 0.012],
+      pos: [side * 0.052, RIG.headY + 0.027, 0.1],
+      rot: [0, 0, side * -0.12],
+      color: WORLD.eyeLine,
+      rough: 0.6,
+      noOutline: true,
+    })
+  }
+
+  /* ---- bangs: two swept panels over the forehead ---- */
+  for (const side of [-1, 1] as const) {
+    parts.push({
+      geom: 'sphere',
+      args: [0.062, 10, 8],
+      pos: [side * 0.056, RIG.headY + 0.0825, 0.052],
+      rot: [0.32, 0, side * 0.38],
+      scale: [1.05, 0.62, 0.9],
+      color: hair,
+      rough: 0.9,
+    })
+  }
+  /* ---- ahoge: a tilted cowlick, pure charm at low-poly cost ---- */
+  parts.push({
+    geom: 'capsule',
+    args: [0.0085, 0.05, 3, 5],
+    pos: [0.018, RIG.headY + RIG.headR + 0.024, -0.005],
+    rot: [0, 0, -0.42],
+    color: hair,
+    rough: 0.9,
   })
 
   /* ---- hair: volume behind and above the skull ---- */

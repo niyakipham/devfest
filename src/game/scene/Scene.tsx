@@ -14,8 +14,14 @@ import { Player } from './Player'
 import { CharacterMesh } from './CharacterMesh'
 import { GARMENTS, RIG, appearanceFor, crowdSlot, hairColor } from './character'
 import { WORLD } from '@world/palette'
+import { cloudTexture, exclaimTexture, glowTexture, groundTexture, moteTexture } from './textures'
 
 const Ground = () => {
+  const groundTex = useMemo(() => {
+    const t = groundTexture()
+    t.repeat.set(34, 28)
+    return t
+  }, [])
   const patches = useMemo(
     () =>
       Array.from({ length: 14 }, (_, i) => {
@@ -34,7 +40,7 @@ const Ground = () => {
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[2500, 0, 2000]} receiveShadow>
         <planeGeometry args={[5200, 4200]} />
-        <meshStandardMaterial color={WORLD.grass} roughness={1} />
+        <meshStandardMaterial map={groundTex} color={WORLD.cloudWhite} roughness={1} />
       </mesh>
       {patches.map((p, i) => (
         <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[p.x, 0.012, p.z]}>
@@ -55,6 +61,102 @@ const Ground = () => {
           </mesh>
         )
       })}
+    </group>
+  )
+}
+
+/**
+ * Sky slice of the Genshin look: a sun halo sitting on the light direction, slow
+ * drifting cumulus billboards, and warm motes (pollen / bóng phấn hoa) catching the
+ * light near the player. All sprites — zero geometry cost, huge atmosphere gain.
+ */
+const SkyRig = () => {
+  const cloudsRef = useRef<THREE.Group>(null)
+  const motesRef = useRef<THREE.Points>(null)
+
+  const clouds = useMemo(
+    () =>
+      Array.from({ length: 9 }, (_, i) => ({
+        x: Math.cos(i * 2.4) * (300 + (i % 4) * 160),
+        y: 235 + (i % 5) * 52,
+        z: Math.sin(i * 2.1) * (320 + ((i + 2) % 4) * 150),
+        s: 150 + ((i * 97) % 140),
+        speed: 3.1 + (i % 3) * 1.8,
+        opacity: 0.55 + ((i * 37) % 30) / 100,
+      })),
+    [],
+  )
+
+  const motePositions = useMemo(() => {
+    const arr = new Float32Array(130 * 3)
+    for (let i = 0; i < 130; i += 1) {
+      const a = i * 2.39996
+      const r = Math.sqrt(((i * 0.754877666) % 1 + 1) % 1) * 70
+      arr[i * 3] = SPAWN.x + Math.cos(a) * r
+      arr[i * 3 + 1] = 0.4 + (((i * 0.37) % 1) + 1) % 1 * 7
+      arr[i * 3 + 2] = SPAWN.z + Math.sin(a) * r
+    }
+    return arr
+  }, [])
+
+  const cloudTex = useMemo(() => cloudTexture(), [])
+  const glowTex = useMemo(() => glowTexture(), [])
+  const moteTex = useMemo(() => moteTexture(), [])
+
+  useFrame((_, dt) => {
+    if (cloudsRef.current) {
+      cloudsRef.current.children.forEach((child, i) => {
+        child.position.x += clouds[i].speed * dt
+        if (child.position.x > 1350) child.position.x = -1350
+      })
+    }
+    const pts = motesRef.current
+    if (pts) {
+      const attr = pts.geometry.getAttribute('position') as THREE.BufferAttribute
+      for (let i = 0; i < attr.count; i += 1) {
+        const y = attr.getY(i) + dt * 0.17
+        attr.setY(i, y > 9 ? 0.4 : y)
+        attr.setX(i, attr.getX(i) + Math.sin(y * 2.1 + i * 1.7) * 0.0045)
+      }
+      attr.needsUpdate = true
+    }
+  })
+
+  const sunX = LAKE.cx + 640
+  const sunY = 430
+  const sunZ = LAKE.cz - 760
+
+  return (
+    <group>
+      {/* two stacked glow sprites: wide halo + hot core */}
+      <sprite position={[sunX, sunY, sunZ]} scale={[460, 460, 1]}>
+        <spriteMaterial map={glowTex} color={WORLD.lampGlow} transparent opacity={0.85} depthWrite={false} fog={false} />
+      </sprite>
+      <sprite position={[sunX, sunY, sunZ]} scale={[130, 130, 1]}>
+        <spriteMaterial map={glowTex} color={WORLD.cloudWhite} transparent opacity={1} depthWrite={false} fog={false} />
+      </sprite>
+      <group ref={cloudsRef}>
+        {clouds.map((c, i) => (
+          <sprite key={i} position={[c.x, c.y, c.z]} scale={[c.s, c.s * 0.55, 1]}>
+            <spriteMaterial map={cloudTex} transparent opacity={c.opacity} depthWrite={false} />
+          </sprite>
+        ))}
+      </group>
+      <points ref={motesRef}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[motePositions, 3]} />
+        </bufferGeometry>
+        <pointsMaterial
+          size={0.55}
+          map={moteTex}
+          color={WORLD.lampEmissive}
+          transparent
+          opacity={0.85}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          sizeAttenuation
+        />
+      </points>
     </group>
   )
 }
@@ -98,13 +200,15 @@ const NpcFigure = ({ npcId }: { npcId: string }) => {
 
 const QuestMarkers = () => {
   const groupRefs = useRef<Array<THREE.Group | null>>([])
+  const exclaimTex = useMemo(() => exclaimTexture(), [])
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
     groupRefs.current.forEach((g, i) => {
       if (!g) return
-      g.position.y = 2.65 + Math.sin(t * 1.8 + i) * 0.09
-      g.rotation.y = t * 0.8
+      g.position.y = 2.75 + Math.sin(t * 1.8 + i) * 0.1
+      const pulse = 1 + Math.sin(t * 2.3 + i * 1.3) * 0.07
+      g.scale.setScalar(pulse)
     })
   })
 
@@ -121,10 +225,9 @@ const QuestMarkers = () => {
             }}
             position={[0, 2.65, 0]}
           >
-            <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[0.26, 0.06, 8, 20]} />
-              <meshStandardMaterial color={WORLD.lampGlow} emissive={WORLD.lampEmissive} emissiveIntensity={0.9} />
-            </mesh>
+            <sprite scale={[0.82, 0.82, 1]}>
+              <spriteMaterial map={exclaimTex} transparent depthWrite={false} />
+            </sprite>
           </group>
         </group>
       ))}
@@ -287,6 +390,8 @@ const Rig = () => {
         shadow-camera-near={1}
         shadow-camera-far={2000}
       />
+      {/* cool rim from the opposite side — the anime “splash art” separator light */}
+      <directionalLight position={[-420, 260, 480]} intensity={0.55} color={WORLD.rimLight} />
     </group>
   )
 }
@@ -303,6 +408,7 @@ export const Scene = () => (
     }}
   >
     <Rig />
+    <SkyRig />
     <Ground />
     <City />
     <Lake />

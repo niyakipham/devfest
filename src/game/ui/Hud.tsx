@@ -2,14 +2,49 @@ import { useEffect, useState } from 'react'
 import { useGameStore } from '../store'
 import { formatClock } from '../scene/atmosphere'
 import { QUESTS } from '../content/quests'
-import { BookIcon, CameraIcon, GearIcon, HelpIcon, MapIcon } from './icons'
+import { COMPANION_SPECIES_BY_CODE, type CompanionSpeciesCode } from '@shared/companion'
+import type { Persona } from '@shared/contracts'
+import {
+  BookIcon,
+  CameraIcon,
+  CycloIcon,
+  GearIcon,
+  HelpIcon,
+  MapIcon,
+  PinIcon,
+  PotIcon,
+} from './icons'
 import { SettingsPanel } from './SettingsPanel'
 
+/**
+ * HUD — ADR-005 “Phố cổ Legends” (Genshin/Pokopia-flavoured): floating white glyphs,
+ * a deep-leaf target pill up top, companion portraits + circular tool buttons in the
+ * bottom-right dock, slim needs on the left. Gameplay wiring is unchanged — only
+ * presentation moved.
+ */
+
 const TOOLS = [
-  { id: 'food', icon: '🍜', label: 'Bánh mì dọc đường' },
-  { id: 'camera', icon: '📷', label: 'Máy ảnh' },
-  { id: 'cyclo', icon: '🛺', label: 'Xích lô' },
+  { id: 'food', Icon: PotIcon, label: 'Bánh mì dọc đường' },
+  { id: 'camera', Icon: CameraIcon, label: 'Máy ảnh' },
+  { id: 'cyclo', Icon: CycloIcon, label: 'Xích lô' },
 ] as const
+
+/** Persona → AI portrait (see public/portraits). Original art, no third-party IP. */
+const PERSONA_PORTRAIT: Record<Persona, string> = {
+  STUDENT: '/portraits/persona-student.jpg',
+  SILVERSMITH: '/portraits/persona-silversmith.jpg',
+  PHO_VENDOR: '/portraits/persona-pho-vendor.jpg',
+  CYCLO_DRIVER: '/portraits/persona-cyclo-driver.jpg',
+  PHOTOGRAPHER: '/portraits/persona-photographer.jpg',
+  FOLK_SINGER: '/portraits/persona-folk-singer.jpg',
+}
+
+const COMPANION_PORTRAIT: Record<string, string> = {
+  'ho-guom-crane': '/portraits/companion-crane.jpg',
+  'ho-tay-bird': '/portraits/companion-bird.jpg',
+  'pho-co-cat': '/portraits/companion-cat.jpg',
+  'bat-trang-potter': '/portraits/companion-turtle.jpg',
+}
 
 const POI_TYPE_LABEL: Record<string, string> = {
   FOOD: 'Quán ăn',
@@ -60,6 +95,8 @@ export const Hud = () => {
   const photoAttempt = useGameStore((s) => s.photoAttempt)
   const quickEat = useGameStore((s) => s.quickEat)
   const addToast = useGameStore((s) => s.addToast)
+  const companion = useGameStore((s) => s.companion)
+  const careCompanion = useGameStore((s) => s.careCompanion)
   const [activeTool, setActiveTool] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [debug, setDebug] = useState(false)
@@ -87,6 +124,10 @@ export const Hud = () => {
   const energy = player.needs.energy
   const filledSegments = Math.max(0, Math.min(10, Math.round(energy / 10)))
 
+  const personaPortrait = PERSONA_PORTRAIT[player.persona]
+  const species = companion ? COMPANION_SPECIES_BY_CODE.get(companion.speciesCode as CompanionSpeciesCode) : undefined
+  const companionPortrait = companion ? COMPANION_PORTRAIT[companion.speciesCode] : undefined
+
   const runTool = (index: number) => {
     setActiveTool(index)
     if (TOOLS[index].id === 'food') quickEat()
@@ -110,14 +151,14 @@ export const Hud = () => {
           {plateName}
           <span className="plate__type">{plateType}</span>
         </div>
-        <div className="plate__bar">
+        <div className="plate__bar" aria-hidden="true">
           <span style={{ width: `${dayProgress}%` }} />
         </div>
       </div>
 
       <nav className="rail" aria-label="Bảng điều khiển">
-        <button type="button" className="rail__btn" title="Bản đồ (M)" onClick={toggleMap} aria-label="Bản đồ">
-          <MapIcon />
+        <button type="button" className="rail__btn rail__btn--map" title="Bản đồ (M)" onClick={toggleMap} aria-label="Bản đồ">
+          <MapIcon size={30} />
         </button>
         <button
           type="button"
@@ -168,59 +209,84 @@ export const Hud = () => {
 
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
 
-      <div className="switch">
-        <div className="switch__row">
-          <button
-            type="button"
-            className="switch__btn"
-            aria-label="Công cụ trước"
-            onClick={() => setActiveTool((i) => (i - 1 + TOOLS.length) % TOOLS.length)}
-          >
-            L
-          </button>
-          <span className="switch__label">{active.label}</span>
-          <button
-            type="button"
-            className="switch__btn"
-            aria-label="Công cụ sau"
-            onClick={() => setActiveTool((i) => (i + 1) % TOOLS.length)}
-          >
-            R
-          </button>
+      {/* -------- bottom-right dock: portraits → circular tools → L/R pill -------- */}
+      <div className="dock">
+        <div className="mates">
+          {companion && species && companionPortrait && (
+            <button
+              type="button"
+              className="mate mate--companion"
+              onClick={() => careCompanion('groom')}
+              aria-label={`Vỗ về ${species.viName}`}
+              title={`${species.viName} · vỗ về mỗi ngày một lần`}
+            >
+              <img src={companionPortrait} alt={species.viName} draggable={false} />
+              <span className="mate__lv">{companion.level}</span>
+            </button>
+          )}
+          <figure className="mate mate--player" title={player.name}>
+            <img src={personaPortrait} alt={`Chân dung ${player.name}`} draggable={false} />
+          </figure>
         </div>
-        <div className="switch__bar" aria-hidden="true">
-          {Array.from({ length: 10 }, (_, i) => (
-            <span key={i} className={`switch__seg ${i < filledSegments ? 'switch__seg--on' : ''}`} />
-          ))}
-        </div>
-      </div>
 
-      <div className="party">
-        {TOOLS.map((tool, i) => (
-          <button
-            key={tool.id}
-            type="button"
-            className={`slot ${i === activeTool ? 'slot--active' : ''}`}
-            onClick={() => runTool(i)}
-            aria-label={tool.label}
-            title={tool.label}
-          >
-            {tool.icon}
-            {tool.id === 'camera' && pieces.length > 0 && <span className="slot__badge">{pieces.length}</span>}
-            {i === activeTool && (
-              <span className="slot__hints" aria-hidden="true">
-                <span className="keycap">E</span>
-                <span className="keycap">J</span>
-              </span>
-            )}
-          </button>
-        ))}
+        <div className="party">
+          {TOOLS.map((tool, i) => {
+            const { Icon } = tool
+            return (
+              <button
+                key={tool.id}
+                type="button"
+                className={`slot ${i === activeTool ? 'slot--active' : ''}`}
+                onClick={() => runTool(i)}
+                aria-label={tool.label}
+                title={tool.label}
+              >
+                <Icon size={i === activeTool ? 30 : 24} />
+                {tool.id === 'camera' && pieces.length > 0 && <span className="slot__badge">{pieces.length}</span>}
+                {i === activeTool && (
+                  <span className="slot__hints" aria-hidden="true">
+                    <span className="keycap">E</span>
+                    <span className="keycap">J</span>
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="switch">
+          <div className="switch__row">
+            <button
+              type="button"
+              className="switch__btn"
+              aria-label="Công cụ trước"
+              onClick={() => setActiveTool((i) => (i - 1 + TOOLS.length) % TOOLS.length)}
+            >
+              L
+            </button>
+            <span className="switch__label">{active.label}</span>
+            <button
+              type="button"
+              className="switch__btn"
+              aria-label="Công cụ sau"
+              onClick={() => setActiveTool((i) => (i + 1) % TOOLS.length)}
+            >
+              R
+            </button>
+          </div>
+          <div className="switch__bar" aria-hidden="true">
+            {Array.from({ length: 10 }, (_, i) => (
+              <span key={i} className={`switch__seg ${i < filledSegments ? 'switch__seg--on' : ''}`} />
+            ))}
+          </div>
+        </div>
       </div>
 
       {prompt && !useGameStore.getState().dialogue && (
         <button type="button" className="prompt" onClick={interact}>
           <span className="prompt__key">E</span>
           {prompt}
+          <PinIcon size={18} />
         </button>
       )}
 

@@ -66,12 +66,28 @@ export const TitleScreen = () => {
   return (
     <div className="title">
       <div className="title__logo">
+        {/* the lake-teardrop mark: azure petal + gold star — our own emblem */}
+        <div className="title__pin" aria-hidden="true">
+          <svg viewBox="0 0 48 60" width="46" height="58" focusable="false">
+            <path
+              className="title__pin-body"
+              d="M24 2C13.5 2 5 10.5 5 21c0 13.4 19 37 19 37s19-23.6 19-37C43 10.5 34.5 2 24 2Z"
+              stroke="var(--c-glass-edge)"
+              strokeWidth="2.5"
+            />
+            <path
+              className="title__pin-star"
+              d="M24 12.4l2.6 6.6 7 0.5-5.3 4.6 1.6 6.8-5.9-3.6-5.9 3.6 1.6-6.8-5.3-4.6 7-.5L24 12.4Z"
+            />
+          </svg>
+        </div>
+        <p className="title__over">Hồ Gươm · Phố Cổ · 20 km²</p>
         <h1>
           Hà Nội
           <br />
           <em>Legends</em>
         </h1>
-        <h2>Phố cổ · 20 km²</h2>
+        <h2>Một ngày của người Hà Nội</h2>
       </div>
 
       <div className="title__menu">
@@ -103,6 +119,8 @@ export const TitleScreen = () => {
       <div className="title__select">
         <span className="keycap">A</span> Chọn
       </div>
+
+      <div className="title__build">Phase 1 · Hoàn Kiếm</div>
     </div>
   )
 }
